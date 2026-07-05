@@ -778,8 +778,117 @@ export const Step3Catalog: React.FC<Step3CatalogProps> = ({ treeData, selectedNo
   const [expandedIds, setExpandedIds] = useState<string[]>(() => collectExpandedIds(treeData));
   const [activeFileTab, setActiveFileTab] = useState<'catalog' | 'preview' | 'add'>('catalog');
   const [addFileMeta, setAddFileMeta] = useState<Record<string, string>>({});
-  const [treeWidth, setTreeWidth] = useState(224); // 224px = w-56
+  const [treeWidth, setTreeWidth] = useState(224);
   const [isDragging, setIsDragging] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; node: MetadataNode | null } | null>(null);
+
+  // Close context menu
+  React.useEffect(() => {
+    const close = () => setContextMenu(null);
+    document.addEventListener('click', close);
+    document.addEventListener('scroll', close, true);
+    return () => {
+      document.removeEventListener('click', close);
+      document.removeEventListener('scroll', close, true);
+    };
+  }, []);
+
+  const findParent = (root: MetadataNode, childId: string): MetadataNode | null => {
+    if (!root.children) return null;
+    for (const c of root.children) {
+      if (c.id === childId) return root;
+      const found = root.children ? (() => {
+        for (const cc of root.children) {
+          if (cc.id === childId) return root;
+          if (cc.children) {
+            const f2 = findParent(cc, childId);
+            if (f2) return f2;
+          }
+        }
+        return null;
+      })() : null;
+      if (found) return found;
+    }
+    return null;
+  };
+
+  const isFirstSibling = (node: MetadataNode): boolean => {
+    if (!treeData.children) return true;
+    const all: MetadataNode[] = [];
+    const collect = (nodes: MetadataNode[]) => {
+      for (const n of nodes) {
+        if (n.type === node.type) all.push(n);
+        if (n.children) collect(n.children);
+      }
+    };
+    collect([treeData]);
+    const idx = all.findIndex(n => n.id === node.id);
+    return idx <= 0;
+  };
+
+  const isLastSibling = (node: MetadataNode): boolean => {
+    if (!treeData.children) return true;
+    const all: MetadataNode[] = [];
+    const collect = (nodes: MetadataNode[]) => {
+      for (const n of nodes) {
+        if (n.type === node.type) all.push(n);
+        if (n.children) collect(n.children);
+      }
+    };
+    collect([treeData]);
+    const idx = all.findIndex(n => n.id === node.id);
+    return idx === -1 || idx >= all.length - 1;
+  };
+
+  const handleContextMenu = (e: React.MouseEvent, node: MetadataNode) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({ x: e.clientX, y: e.clientY, node });
+  };
+
+  const execContextAction = (action: string) => {
+    const node = contextMenu?.node;
+    if (!node) return;
+    setContextMenu(null);
+    switch (action) {
+      case 'up': onMoveFile?.(node.id, 'up'); break;
+      case 'down': onMoveFile?.(node.id, 'down'); break;
+      case 'expand': if (!isExpanded(node.id)) toggleExpand(node.id); break;
+      case 'collapse': if (isExpanded(node.id)) toggleExpand(node.id); break;
+      case 'addFile': setActiveFileTab('add'); setAddFileMeta({}); break;
+      case 'replaceFile': {
+        const input = document.createElement('input');
+        input.type = 'file'; input.accept = '.pdf';
+        input.onchange = (e: any) => {
+          const file = e.target?.files?.[0];
+          if (!file) return;
+          const r = new FileReader();
+          r.onload = () => onReplacePdf?.(node.id, r.result as string);
+          r.readAsDataURL(file);
+        };
+        input.click();
+        break;
+      }
+      case 'deleteFile': if (confirm('确认删除此文件？')) onDeleteFile?.(node.id); break;
+    }
+  };
+
+  const menuDisabled = (action: string): boolean => {
+    const node = contextMenu?.node;
+    if (!node) return true;
+    const hasCh = !!node.children?.length;
+    const exp = isExpanded(node.id);
+    switch (action) {
+      case 'up': return node.type === 'PROJECT' || isFirstSibling(node);
+      case 'down': return node.type === 'PROJECT' || isLastSibling(node);
+      case 'expand': return !hasCh || exp;
+      case 'collapse': return !hasCh || !exp;
+      case 'addFile': return node.type !== 'VOLUME';
+      case 'replaceFile': return node.type !== 'FILE';
+      case 'deleteFile': return node.type !== 'FILE';
+      default: return true;
+    }
+  };
 
   // Resize handler
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -817,6 +926,7 @@ export const Step3Catalog: React.FC<Step3CatalogProps> = ({ treeData, selectedNo
         <div
           className={`flex items-center py-2 px-3 cursor-pointer transition-colors text-xs ${sel ? 'bg-blue-50 text-blue-700 font-medium' : 'hover:bg-slate-50 text-slate-700'}`}
           style={{ paddingLeft: `${level * 16 + 8}px` }}
+          onContextMenu={(e) => handleContextMenu(e, node)}
         >
           {hasCh ? (
             <button onClick={(e) => { e.stopPropagation(); toggleExpand(node.id); }}
@@ -837,7 +947,8 @@ export const Step3Catalog: React.FC<Step3CatalogProps> = ({ treeData, selectedNo
   const categories = FIELD_MAP[selectedNode.type] || [];
 
   return (
-    <div className="flex flex-col h-full">
+    <>
+      <div className="flex flex-col h-full">
       <div className="flex justify-between items-center px-6 py-2 border-b border-slate-200 bg-slate-50/50">
         <div>
           <h3 className="text-sm font-bold text-slate-800">档案著录</h3>
@@ -879,49 +990,24 @@ export const Step3Catalog: React.FC<Step3CatalogProps> = ({ treeData, selectedNo
             </div>
 
             {selectedNode.type === 'PROJECT' ? (
-              <ProjectForm data={selectedNode.data} />
+              <img src="/Meta_project.png" alt="项目级著录单" className="border border-slate-200 rounded-lg max-w-full" />
             ) : selectedNode.type === 'UNIT' ? (
-              <UnitForm data={selectedNode.data} />
+              <img src="/Meta_unit.png" alt="工程级著录单" className="border border-slate-200 rounded-lg max-w-full" />
             ) : selectedNode.type === 'VOLUME' ? (
-              <VolumeForm data={selectedNode.data} />
+              <img src="/Meta_volume.png" alt="案卷级著录单" className="border border-slate-200 rounded-lg max-w-full" />
             ) : selectedNode.type === 'FILE' ? (
               <div className="space-y-2">
-                {/* Tab buttons + Operation buttons */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1">
-                    <button onClick={() => setActiveFileTab('catalog')}
-                      className={`px-3 py-1 text-xs rounded-lg font-medium ${activeFileTab === 'catalog' ? 'bg-sky-100 text-sky-700' : 'text-slate-500 hover:bg-slate-100'}`}>著录</button>
-                    <span className="text-slate-200 mx-1">|</span>
-                    <button onClick={() => onMoveFile?.(selectedNode.id, 'up')}
-                      className="px-2 py-1 text-[10px] bg-white border border-slate-200 rounded text-slate-500 hover:bg-slate-50">上移</button>
-                    <button onClick={() => onMoveFile?.(selectedNode.id, 'down')}
-                      className="px-2 py-1 text-[10px] bg-white border border-slate-200 rounded text-slate-500 hover:bg-slate-50">下移</button>
-                    <button onClick={() => { setActiveFileTab('add'); setAddFileMeta({}); }}
-                      className="px-2 py-1 text-[10px] bg-white border border-slate-200 rounded text-slate-500 hover:bg-slate-50">添加文件</button>
-                    <button onClick={() => {
-                      const input = document.createElement('input');
-                      input.type = 'file';
-                      input.accept = '.pdf';
-                      input.onchange = (e: any) => {
-                        const file = e.target?.files?.[0];
-                        if (!file) return;
-                        const reader = new FileReader();
-                        reader.onload = () => onReplacePdf?.(selectedNode.id, reader.result as string);
-                        reader.readAsDataURL(file);
-                      };
-                      input.click();
-                    }}
-                      className="px-2 py-1 text-[10px] bg-white border border-slate-200 rounded text-slate-500 hover:bg-slate-50">更换文件</button>
-                    <button onClick={() => { if (confirm('确认删除此文件？')) onDeleteFile?.(selectedNode.id); }}
-                      className="px-2 py-1 text-[10px] bg-red-50 border border-red-200 rounded text-red-600 hover:bg-red-100">删除文件</button>
-                  </div>
+                {/* Tab buttons */}
+                <div className="flex items-center gap-2">
+                  <button onClick={() => setActiveFileTab('catalog')}
+                    className={`px-3 py-1 text-xs rounded-lg font-medium ${activeFileTab === 'catalog' ? 'bg-sky-100 text-sky-700' : 'text-slate-500 hover:bg-slate-100'}`}>著录</button>
                   <button onClick={() => setActiveFileTab('preview')}
                     className={`px-3 py-1 text-xs rounded-lg font-medium ${activeFileTab === 'preview' ? 'bg-sky-100 text-sky-700' : 'bg-white border border-slate-200 text-slate-500 hover:bg-slate-50'}`}>预览</button>
                 </div>
 
                 {/* 著录 tab */}
                 {activeFileTab === 'catalog' && (
-                  <FileForm data={selectedNode.data} />
+                  <img src="/Meta_file.png" alt="文件级著录单" className="border border-slate-200 rounded-lg max-w-full" />
                 )}
 
                 {/* 预览 tab */}
@@ -991,5 +1077,43 @@ export const Step3Catalog: React.FC<Step3CatalogProps> = ({ treeData, selectedNo
         </div>
       </div>
     </div>
+
+      {/* Context Menu */}
+      {contextMenu && (
+        <div
+          className="fixed z-50 bg-white border border-slate-200 rounded-lg shadow-lg py-1 min-w-[140px]"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+        >
+          {[
+            { label: '上移', action: 'up' },
+            { label: '下移', action: 'down' },
+            { type: 'divider' },
+            { label: '展开子节点', action: 'expand' },
+            { label: '收起子节点', action: 'collapse' },
+            { type: 'divider' },
+            { label: '添加文件', action: 'addFile' },
+            { label: '更换文件', action: 'replaceFile' },
+            { label: '删除文件', action: 'deleteFile' },
+          ].map((item, i) =>
+            item.type === 'divider' ? (
+              <div key={i} className="border-t border-slate-100 my-1" />
+            ) : (
+              <button
+                key={i}
+                disabled={menuDisabled(item.action!)}
+                onClick={() => execContextAction(item.action!)}
+                className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${
+                  menuDisabled(item.action!)
+                    ? 'text-slate-300 cursor-not-allowed'
+                    : 'text-slate-700 hover:bg-sky-50'
+                }`}
+              >
+                {item.label}
+              </button>
+            )
+          )}
+        </div>
+      )}
+    </>
   );
 };
