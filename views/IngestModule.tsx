@@ -1,5 +1,4 @@
-import React, { useState, useRef, useMemo } from 'react';
-import { Upload } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
 import { IngestTask } from '../types';
 import { Step1Upload } from './Step1Upload';
 import { Step2Inspection } from './Step2Inspection';
@@ -269,7 +268,6 @@ export const IngestModule: React.FC = () => {
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
   const [treeData, setTreeData] = useState(INITIAL_TREE_DATA);
   const [selectedNode, setSelectedNode] = useState(INITIAL_TREE_DATA);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -350,46 +348,6 @@ export const IngestModule: React.FC = () => {
 
   return (
     <>
-      {/* Step Indicator with Upload Button */}
-      <div className="bg-white border-b border-slate-200 px-6 py-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm">
-            {([
-              [1, '上传'],
-              [2, '检测'],
-              [3, '著录'],
-              [4, '入库'],
-            ] as const).map(([step, label], idx) => (
-              <div key={step} className="flex items-center gap-2">
-                {idx > 0 && <div className="w-8 h-px bg-slate-300" />}
-                <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors
-                  ${workflowStep === step ? 'bg-blue-100 text-blue-700' :
-                    workflowStep > step ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}
-                `}>
-                  <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold
-                    ${workflowStep === step ? 'bg-blue-600 text-white' :
-                      workflowStep > step ? 'bg-emerald-500 text-white' : 'bg-slate-300 text-white'}
-                  `}>{step}</span>
-                  {label}
-                </div>
-              </div>
-            ))}
-          </div>
-          {workflowStep === 1 && (
-            <>
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center shadow-lg shadow-blue-600/20 transition-all text-sm font-medium"
-              >
-                <Upload size={16} className="mr-2" />
-                上传档案包
-              </button>
-              <input type="file" ref={fileInputRef} className="hidden" multiple onChange={handleFileUpload} />
-            </>
-          )}
-        </div>
-      </div>
-
       {workflowStep === 1 && (
           <Step1Upload
             tasks={tasks}

@@ -22,14 +22,14 @@ interface Step3CatalogProps {
   onCancel: () => void;
 }
 
-// ─── Field definitions parsed from data/*.txt ───
+// ─── Field definitions ───
 
 interface FieldDef { label: string; key: string; span?: string; isTextarea?: boolean; }
 interface CategoryDef { name: string; fields: FieldDef[]; }
 
 const PROJECT_FIELDS: CategoryDef[] = [
   { name: '基本信息', fields: [
-    { label: '工程名称', key: 'projectName', span: 'col-span-3' },
+    { label: '项目名称', key: 'projectName', span: 'col-span-3' },
     { label: '工程地点', key: 'address', span: 'col-span-3' },
   ]},
   { name: '责任者', fields: [
@@ -39,7 +39,7 @@ const PROJECT_FIELDS: CategoryDef[] = [
     { label: '勘察单位', key: 'surveyUnit', span: 'col-span-3' },
     { label: '监理单位', key: 'supervisionUnit', span: 'col-span-3' },
   ]},
-  { name: '文件项目', fields: [
+  { name: '文号项', fields: [
     { label: '立项批准文号', key: 'approvalNo', span: 'col-span-2' },
     { label: '工程规划许可证号', key: 'planPermitNo', span: 'col-span-2' },
     { label: '用地规划许可证号', key: 'landPlanPermitNo', span: 'col-span-2' },
@@ -192,6 +192,488 @@ function collectExpandedIds(node: MetadataNode): string[] {
   return ids;
 }
 
+// ─── Shared form field components ───
+
+function FieldRow({ label, value, data, fieldKey, isTextarea }: { label: string; value?: string; data: Record<string, string>; fieldKey: string; isTextarea?: boolean }) {
+  return (
+    <div className="flex">
+      <div className="w-[100px] shrink-0 bg-sky-50 px-1.5 py-1 text-xs font-semibold text-slate-700 border-r border-slate-200 flex items-center justify-center text-center">{label}</div>
+      <div className="flex-1 px-1.5 py-1 bg-white">
+        {isTextarea ? (
+          <textarea defaultValue={data[fieldKey] || ''} rows={1}
+            className="w-full border-0 bg-transparent outline-none text-xs resize-none text-slate-800" />
+        ) : (
+          <input type="text" defaultValue={data[fieldKey] || ''}
+            className="w-full border-0 bg-transparent outline-none text-xs text-slate-800" />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function FullRow({ label, value, data, fieldKey, isTextarea }: { label: string; value?: string; data: Record<string, string>; fieldKey: string; isTextarea?: boolean }) {
+  return (
+    <div className="flex">
+      <div className="w-[100px] shrink-0 bg-sky-50 px-1.5 py-1 text-xs font-semibold text-slate-700 border-r border-slate-200 flex items-center justify-center text-center">{label}</div>
+      <div className="flex-1 px-1.5 py-1 bg-white">
+        {isTextarea ? (
+          <textarea defaultValue={data[fieldKey] || ''} rows={1}
+            className="w-full border-0 bg-transparent outline-none text-xs resize-none text-slate-800" />
+        ) : (
+          <input type="text" defaultValue={data[fieldKey] || ''}
+            className="w-full border-0 bg-transparent outline-none text-xs text-slate-800" />
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Project-level form ───
+
+function ProjectForm({ data }: { data: Record<string, string> }) {
+  const PCF = (label: string, key: string) => (
+    <div className="flex">
+      <div className="w-[110px] shrink-0 bg-sky-50 px-1.5 py-1 text-xs font-semibold text-slate-700 border-r border-slate-200 flex items-center justify-center text-center">{label}</div>
+      <div className="flex-1 px-1.5 py-1 bg-white"><input type="text" defaultValue={data[key] || ''} className="w-full border-0 bg-transparent outline-none text-xs text-slate-800" /></div>
+    </div>
+  );
+  return (
+    <div className="border border-slate-200 rounded-lg overflow-hidden bg-white">
+      <div className="divide-y divide-slate-200">
+        {/* 工程名称 + 工程地点 */}
+        <div className="flex divide-x divide-slate-200">
+          <div className="flex-1 min-w-0">
+            <div className="flex">
+              <div className="w-[100px] shrink-0 bg-sky-50 px-1.5 py-1 text-xs font-semibold text-slate-700 border-r border-slate-200 flex items-center justify-center text-center">工程名称</div>
+              <div className="flex-1 px-1.5 py-1 bg-white"><input type="text" defaultValue={data.projectName || ''} className="w-full border-0 bg-transparent outline-none text-xs text-slate-800" /></div>
+            </div>
+          </div>
+          <div className="w-[300px] shrink-0">
+            <div className="flex">
+              <div className="w-[80px] shrink-0 bg-sky-50 px-1.5 py-1 text-xs font-semibold text-slate-700 border-r border-slate-200 flex items-center justify-center text-center">工程地点</div>
+              <div className="flex-1 px-1.5 py-1 bg-white"><input type="text" defaultValue={data.address || ''} className="w-full border-0 bg-transparent outline-none text-xs text-slate-800" /></div>
+            </div>
+          </div>
+        </div>
+
+        {/* 责任者 + 文号项 */}
+        <div>
+          <div className="grid grid-cols-2 divide-x divide-slate-200">
+            <div className="px-2 py-0.5 text-xs font-bold text-slate-700 bg-blue-200 text-center">责任者</div>
+            <div className="px-2 py-0.5 text-xs font-bold text-slate-700 bg-blue-200 text-center">文号项</div>
+          </div>
+          <div className="divide-y divide-slate-200">
+            <div className="grid grid-cols-2 divide-x divide-slate-200">
+              {PCF('建设单位', 'constructionUnit')}
+              {PCF('立项批准文号', 'approvalNo')}
+            </div>
+            <div className="grid grid-cols-2 divide-x divide-slate-200">
+              {PCF('立项批准单位', 'approvalUnit')}
+              {PCF('工程规划许可证号', 'planPermitNo')}
+            </div>
+            <div className="grid grid-cols-2 divide-x divide-slate-200">
+              {PCF('设计单位', 'designUnit')}
+              {PCF('用地规划许可证号', 'landPlanPermitNo')}
+            </div>
+            <div className="grid grid-cols-2 divide-x divide-slate-200">
+              {PCF('勘察单位', 'surveyUnit')}
+              {PCF('用地许可证号', 'landUsePermitNo')}
+            </div>
+            <div className="grid grid-cols-2 divide-x divide-slate-200">
+              {PCF('监理单位', 'supervisionUnit')}
+              {PCF('施工许可证号', 'workPermitNo')}
+            </div>
+          </div>
+        </div>
+
+        {/* 专业记载 */}
+        <div>
+          <div className="px-2 py-0.5 text-xs font-bold text-slate-700 bg-blue-200 border-b border-slate-200 text-center">专业记载</div>
+          <div className="flex divide-x divide-slate-200 bg-sky-50">
+            <div className="flex-1 min-w-0 px-1 py-0.5 text-xs font-semibold text-slate-600 text-center border-b border-slate-200">单位工程名称</div>
+            <div className="flex-1 min-w-0 px-1 py-0.5 text-xs font-semibold text-slate-600 text-center border-b border-slate-200">施工单位</div>
+            <div className="w-[65px] shrink-0 px-1 py-0.5 text-xs font-semibold text-slate-600 text-center border-b border-slate-200">建筑面积</div>
+            <div className="w-[55px] shrink-0 px-1 py-0.5 text-xs font-semibold text-slate-600 text-center border-b border-slate-200">高度(m)</div>
+            <div className="w-[50px] shrink-0 px-1 py-0.5 text-xs font-semibold text-slate-600 text-center border-b border-slate-200">地下</div>
+            <div className="w-[50px] shrink-0 px-1 py-0.5 text-xs font-semibold text-slate-600 text-center border-b border-slate-200">地上</div>
+            <div className="w-[55px] shrink-0 px-1 py-0.5 text-xs font-semibold text-slate-600 text-center border-b border-slate-200">结构</div>
+            <div className="w-[75px] shrink-0 px-1 py-0.5 text-xs font-semibold text-slate-600 text-center border-b border-slate-200">开工时间</div>
+            <div className="w-[75px] shrink-0 px-1 py-0.5 text-xs font-semibold text-slate-600 text-center border-b border-slate-200">竣工时间</div>
+          </div>
+          <div className="flex divide-x divide-slate-200">
+            <div className="flex-1 min-w-0 px-1 py-0.5"><input type="text" defaultValue={data.unitProjectName || ''} className="w-full border-0 bg-transparent outline-none text-xs text-slate-800 text-center" /></div>
+            <div className="flex-1 min-w-0 px-1 py-0.5"><input type="text" defaultValue={data.constructionOrg || ''} className="w-full border-0 bg-transparent outline-none text-xs text-slate-800 text-center" /></div>
+            <div className="w-[65px] shrink-0 px-1 py-0.5"><input type="text" defaultValue={data.area || ''} className="w-full border-0 bg-transparent outline-none text-xs text-slate-800 text-center" /></div>
+            <div className="w-[55px] shrink-0 px-1 py-0.5"><input type="text" defaultValue={data.height || ''} className="w-full border-0 bg-transparent outline-none text-xs text-slate-800 text-center" /></div>
+            <div className="w-[50px] shrink-0 px-1 py-0.5"><input type="text" defaultValue={data.layerUnder || ''} className="w-full border-0 bg-transparent outline-none text-xs text-slate-800 text-center" /></div>
+            <div className="w-[50px] shrink-0 px-1 py-0.5"><input type="text" defaultValue={data.layerAbove || ''} className="w-full border-0 bg-transparent outline-none text-xs text-slate-800 text-center" /></div>
+            <div className="w-[55px] shrink-0 px-1 py-0.5"><input type="text" defaultValue={data.structure || ''} className="w-full border-0 bg-transparent outline-none text-xs text-slate-800 text-center" /></div>
+            <div className="w-[75px] shrink-0 px-1 py-0.5"><input type="text" defaultValue={data.startDate || ''} className="w-full border-0 bg-transparent outline-none text-xs text-slate-800 text-center" /></div>
+            <div className="w-[75px] shrink-0 px-1 py-0.5"><input type="text" defaultValue={data.endDate || ''} className="w-full border-0 bg-transparent outline-none text-xs text-slate-800 text-center" /></div>
+          </div>
+          {/* 财务汇总行 */}
+          <div className="grid grid-cols-5 divide-x divide-slate-200 border-t border-slate-200 border-b border-slate-200 bg-sky-50">
+            <div className="px-1 py-0.5 text-xs font-semibold text-slate-600 text-center">总用地面积</div>
+            <div className="px-1 py-0.5 text-xs font-semibold text-slate-600 text-center">总建筑面积</div>
+            <div className="px-1 py-0.5 text-xs font-semibold text-slate-600 text-center">幢数</div>
+            <div className="px-1 py-0.5 text-xs font-semibold text-slate-600 text-center">工程造价</div>
+            <div className="px-1 py-0.5 text-xs font-semibold text-slate-600 text-center">工程结算</div>
+          </div>
+          <div className="grid grid-cols-5 divide-x divide-slate-200">
+            {PCF('总用地面积', 'totalLandArea')}
+            {PCF('总建筑面积', 'totalBuildingArea')}
+            {PCF('幢数', 'buildingCount')}
+            {PCF('工程造价', 'budget')}
+            {PCF('工程结算', 'settlement')}
+          </div>
+        </div>
+
+        {/* 档案状况 */}
+        <div>
+          <div className="px-2 py-0.5 text-xs font-bold text-slate-700 bg-blue-200 border-b border-slate-200 text-center">档案状况</div>
+          <div className="grid grid-cols-5 divide-x divide-slate-200">
+            {PCF('总卷数', 'volCount')}
+            {PCF('文字(卷)', 'textVol')}
+            {PCF('图纸(卷)', 'drawingVol')}
+            {PCF('底图(张)', 'statDrawing')}
+            {PCF('竣工图(张)', 'statFinishedDrawing')}
+          </div>
+          <div className="grid grid-cols-5 divide-x divide-slate-200 border-t border-slate-200">
+            {PCF('照片(张)', 'statPhoto')}
+            {PCF('录音带(盒)', 'statAudio')}
+            {PCF('录像带(盒)', 'statVideo')}
+            {PCF('光盘(张)', 'statDisk')}
+            {PCF('其他', 'statOther')}
+          </div>
+        </div>
+
+        {/* 保管信息 */}
+        <div>
+          <div className="px-2 py-0.5 text-xs font-bold text-slate-700 bg-blue-200 border-b border-slate-200 text-center">保管信息</div>
+          <div className="grid grid-cols-4 divide-x divide-slate-200">
+            {PCF('保管期限', 'retention')}
+            {PCF('密级', 'security')}
+            {PCF('进馆日期', 'entryDate')}
+            <div className="flex">
+              <div className="w-[110px] shrink-0 bg-sky-50 px-1.5 py-1 text-xs font-semibold text-slate-700 border-r border-slate-200 flex items-center justify-center text-center">移交单位</div>
+              <div className="flex-1 px-1.5 py-1 bg-white"><input type="text" defaultValue={data.handoverUnit || ''} className="w-full border-0 bg-transparent outline-none text-xs text-slate-800" /></div>
+            </div>
+          </div>
+        </div>
+
+        {/* 排检与编号 */}
+        <div>
+          <div className="px-2 py-0.5 text-xs font-bold text-slate-700 bg-blue-200 border-b border-slate-200 text-center">排检与编号</div>
+          <div className="grid grid-cols-3 divide-x divide-slate-200">
+            {PCF('档号', 'archiveCode')}
+            {PCF('质监号', 'qualitySupervisionNo')}
+            {PCF('存放位置起始号', 'storageStartNo')}
+          </div>
+        </div>
+
+        {/* 附注 */}
+        <div className="flex">
+          <div className="w-[100px] shrink-0 bg-sky-50 px-1.5 py-1 text-xs font-semibold text-slate-700 border-r border-slate-200 flex items-center justify-center text-center">附注</div>
+          <div className="flex-1 px-1.5 py-1 bg-white"><textarea defaultValue={data.notes || ''} rows={1} className="w-full border-0 bg-transparent outline-none text-xs resize-none text-slate-800" /></div>
+        </div>
+
+        {/* 录入 */}
+        <div className="grid grid-cols-2 divide-x divide-slate-200">
+            <div className="flex">
+              <div className="w-[80px] shrink-0 bg-sky-50 px-1.5 py-1 text-xs font-semibold text-slate-700 border-r border-slate-200 flex items-center justify-center text-center">录入人</div>
+              <div className="flex-1 px-1.5 py-1 bg-white"><input type="text" defaultValue={data.inputPerson || ''} className="w-full border-0 bg-transparent outline-none text-xs text-slate-800" /></div>
+            </div>
+            <div className="flex">
+              <div className="w-[80px] shrink-0 bg-sky-50 px-1.5 py-1 text-xs font-semibold text-slate-700 border-r border-slate-200 flex items-center justify-center text-center">录入时间</div>
+              <div className="flex-1 px-1.5 py-1 bg-white"><input type="text" defaultValue={data.inputTime || ''} className="w-full border-0 bg-transparent outline-none text-xs text-slate-800" /></div>
+            </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Engineering-level form ───
+
+function UnitForm({ data }: { data: Record<string, string> }) {
+  const UCF = (label: string, key: string) => (
+    <div className="flex">
+      <div className="w-[120px] shrink-0 bg-sky-50 px-1.5 py-1 text-xs font-semibold text-slate-700 border-r border-slate-200 flex items-center justify-center text-center">{label}</div>
+      <div className="flex-1 px-1.5 py-1 bg-white"><input type="text" defaultValue={data[key] || ''} className="w-full border-0 bg-transparent outline-none text-xs text-slate-800" /></div>
+    </div>
+  );
+  return (
+    <div className="border border-slate-200 rounded-lg overflow-hidden bg-white">
+      <div className="divide-y divide-slate-200">
+        {/* 基本信息 */}
+        <div>
+          <div className="px-2 py-0.5 text-xs font-bold text-slate-700 bg-emerald-100 border-b border-slate-200 text-center">基本信息</div>
+          <div className="grid grid-cols-2 divide-x divide-slate-200">
+            <div className="divide-y divide-slate-200">
+              {UCF('单位工程名称', 'unitName')}
+              {UCF('质量安全监督单位', 'supervisionUnit')}
+            </div>
+            <div className="divide-y divide-slate-200">
+              {UCF('施工单位', 'constructionUnit')}
+              {UCF('规划许可证号', 'planPermitNo')}
+            </div>
+          </div>
+        </div>
+
+        {/* 专业记载 */}
+        <div>
+          <div className="px-2 py-0.5 text-xs font-bold text-slate-700 bg-emerald-100 border-b border-slate-200 text-center">专业记载</div>
+          <div className="flex divide-x divide-slate-200 bg-sky-50">
+            <div className="flex-1 min-w-0 px-1 py-0.5 text-xs font-semibold text-slate-600 text-center border-b border-slate-200">建筑面积(m²)</div>
+            <div className="flex-1 min-w-0 px-1 py-0.5 text-xs font-semibold text-slate-600 text-center border-b border-slate-200">高度(m)</div>
+            <div className="flex-1 min-w-0 px-1 py-0.5 text-xs font-semibold text-slate-600 text-center border-b border-slate-200">地下</div>
+            <div className="flex-1 min-w-0 px-1 py-0.5 text-xs font-semibold text-slate-600 text-center border-b border-slate-200">地上</div>
+            <div className="flex-1 min-w-0 px-1 py-0.5 text-xs font-semibold text-slate-600 text-center border-b border-slate-200">结构</div>
+            <div className="flex-1 min-w-0 px-1 py-0.5 text-xs font-semibold text-slate-600 text-center border-b border-slate-200">栋数</div>
+            <div className="flex-1 min-w-0 px-1 py-0.5 text-xs font-semibold text-slate-600 text-center border-b border-slate-200">开工时间</div>
+            <div className="flex-1 min-w-0 px-1 py-0.5 text-xs font-semibold text-slate-600 text-center border-b border-slate-200">竣工时间</div>
+          </div>
+          <div className="flex divide-x divide-slate-200">
+            <div className="flex-1 min-w-0 px-1 py-0.5"><input type="text" defaultValue={data.area || ''} className="w-full border-0 bg-transparent outline-none text-xs text-slate-800 text-center" /></div>
+            <div className="flex-1 min-w-0 px-1 py-0.5"><input type="text" defaultValue={data.height || ''} className="w-full border-0 bg-transparent outline-none text-xs text-slate-800 text-center" /></div>
+            <div className="flex-1 min-w-0 px-1 py-0.5"><input type="text" defaultValue={data.layerUnder || ''} className="w-full border-0 bg-transparent outline-none text-xs text-slate-800 text-center" /></div>
+            <div className="flex-1 min-w-0 px-1 py-0.5"><input type="text" defaultValue={data.layerAbove || ''} className="w-full border-0 bg-transparent outline-none text-xs text-slate-800 text-center" /></div>
+            <div className="flex-1 min-w-0 px-1 py-0.5"><input type="text" defaultValue={data.structure || ''} className="w-full border-0 bg-transparent outline-none text-xs text-slate-800 text-center" /></div>
+            <div className="flex-1 min-w-0 px-1 py-0.5"><input type="text" defaultValue={data.buildingCount || ''} className="w-full border-0 bg-transparent outline-none text-xs text-slate-800 text-center" /></div>
+            <div className="flex-1 min-w-0 px-1 py-0.5"><input type="text" defaultValue={data.startDate || ''} className="w-full border-0 bg-transparent outline-none text-xs text-slate-800 text-center" /></div>
+            <div className="flex-1 min-w-0 px-1 py-0.5"><input type="text" defaultValue={data.endDate || ''} className="w-full border-0 bg-transparent outline-none text-xs text-slate-800 text-center" /></div>
+          </div>
+        </div>
+
+        {/* 档案状况 */}
+        <div>
+          <div className="px-2 py-0.5 text-xs font-bold text-slate-700 bg-emerald-100 border-b border-slate-200 text-center">档案状况</div>
+          <div className="grid grid-cols-3 divide-x divide-slate-200">
+            {UCF('案卷数', 'volCount')}
+            {UCF('文字(卷)', 'textVol')}
+            {UCF('图纸(卷)', 'drawingVol')}
+          </div>
+        </div>
+
+        {/* 保管信息 */}
+        <div>
+          <div className="px-2 py-0.5 text-xs font-bold text-slate-700 bg-emerald-100 border-b border-slate-200 text-center">保管信息</div>
+          <div className="grid grid-cols-3 divide-x divide-slate-200">
+            {UCF('保管期限', 'retention')}
+            {UCF('密级', 'secretLevel')}
+            {UCF('进馆日期', 'entryDate')}
+          </div>
+          <div className="grid grid-cols-2 divide-x divide-slate-200 border-t border-slate-200">
+            {UCF('移交单位', 'handoverUnit')}
+            {UCF('档案状态', 'archiveStatus')}
+          </div>
+        </div>
+
+        {/* 排检与编号 */}
+        <div>
+          <div className="px-2 py-0.5 text-xs font-bold text-slate-700 bg-emerald-100 border-b border-slate-200 text-center">排检与编号</div>
+          <div className="grid grid-cols-3 divide-x divide-slate-200">
+            {UCF('档号', 'archiveCode')}
+            {UCF('缩微号', 'microNo')}
+            {UCF('存放位置起始号', 'storageStartNo')}
+          </div>
+          <div className="flex border-t border-slate-200">
+            <div className="w-[120px] shrink-0 bg-sky-50 px-1.5 py-1 text-xs font-semibold text-slate-700 border-r border-slate-200 flex items-center justify-center text-center">附注</div>
+            <div className="flex-1 px-1.5 py-1 bg-white"><textarea defaultValue={data.notes || ''} rows={1} className="w-full border-0 bg-transparent outline-none text-xs resize-none text-slate-800" /></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Volume-level form ───
+
+function VolumeForm({ data }: { data: Record<string, string> }) {
+  const VCF = (label: string, key: string) => (
+    <div className="flex">
+      <div className="w-[100px] shrink-0 bg-sky-50 px-1.5 py-1 text-xs font-semibold text-slate-700 border-r border-slate-200 flex items-center justify-center text-center whitespace-nowrap">{label}</div>
+      <div className="flex-1 px-1.5 py-1 bg-white"><input type="text" defaultValue={data[key] || ''} className="w-full border-0 bg-transparent outline-none text-xs text-slate-800" /></div>
+    </div>
+  );
+  return (
+    <div className="border border-slate-200 rounded-lg overflow-hidden bg-white">
+      <div className="divide-y divide-slate-200">
+        {/* 专业记载 */}
+        <div>
+          <div className="px-2 py-0.5 text-xs font-bold text-slate-700 bg-amber-50 border-b border-slate-200 text-center">专业记载</div>
+          <div className="flex border-b border-slate-200">
+            <div className="w-[100px] shrink-0 bg-sky-50 px-1.5 py-1 text-xs font-semibold text-slate-700 border-r border-slate-200 flex items-center justify-center text-center">案卷题名</div>
+            <div className="flex-1 px-1.5 py-1 bg-white"><textarea defaultValue={data.title || ''} rows={1} className="w-full border-0 bg-transparent outline-none text-xs resize-none text-slate-800" /></div>
+          </div>
+          <div className="grid grid-cols-4 divide-x divide-slate-200">
+            {VCF('编制单位', 'preparationUnit')}
+            {VCF('进馆日期', 'entryDate')}
+            {VCF('载体类型', 'carrierType')}
+            {VCF('规格', 'specs')}
+          </div>
+          <div className="grid grid-cols-3 divide-x divide-slate-200 border-t border-slate-200">
+            {VCF('数量/单位', 'quantityUnit')}
+            {VCF('卷内文件起始时间', 'startTime')}
+            {VCF('卷内文件终止时间', 'endTime')}
+          </div>
+          <div className="grid grid-cols-3 divide-x divide-slate-200 border-t border-slate-200 border-b border-slate-200">
+            {VCF('保管期限', 'retention')}
+            {VCF('密级', 'secretLevel')}
+            {VCF('主题词', 'keywords')}
+          </div>
+          <div className="flex">
+            <div className="w-[100px] shrink-0 bg-sky-50 px-1.5 py-1 text-xs font-semibold text-slate-700 border-r border-slate-200 flex items-center justify-center text-center">附注</div>
+            <div className="flex-1 px-1.5 py-1 bg-white"><textarea defaultValue={data.notes || ''} rows={1} className="w-full border-0 bg-transparent outline-none text-xs resize-none text-slate-800" /></div>
+          </div>
+        </div>
+
+        {/* 档号 */}
+        <div>
+          <div className="px-2 py-0.5 text-xs font-bold text-slate-700 bg-amber-50 border-b border-slate-200 text-center">档号</div>
+          <div className="flex border-b border-slate-200">
+            <div className="w-[100px] shrink-0 bg-sky-50 px-1.5 py-1 text-xs font-semibold text-slate-700 border-r border-slate-200 flex items-center justify-center text-center">档号</div>
+            <div className="flex-1 px-1.5 py-1 bg-white"><input type="text" defaultValue={data.archiveCode || ''} className="w-full border-0 bg-transparent outline-none text-xs text-slate-800" /></div>
+          </div>
+          <div className="grid grid-cols-3 divide-x divide-slate-200">
+            {VCF('总登记号', 'totalRegNo')}
+            {VCF('大类流水号', 'classSerialNo')}
+            {VCF('案卷档号', 'volumeCode')}
+          </div>
+        </div>
+
+        {/* 工程档案整理记录 */}
+        <div>
+          <div className="px-2 py-0.5 text-xs font-bold text-slate-700 bg-amber-50 border-b border-slate-200 text-center">工程档案整理记录</div>
+          <div className="grid grid-cols-2 divide-x divide-slate-200">
+            <div className="divide-y divide-slate-200">
+              {VCF('案卷整理人', 'organizer')}
+              {VCF('审核人', 'auditor')}
+            </div>
+            <div className="divide-y divide-slate-200">
+              {VCF('案卷整理日期', 'organizeDate')}
+              {VCF('审核日期', 'auditDate')}
+            </div>
+          </div>
+        </div>
+
+        {/* 档案状况 */}
+        <div>
+          <div className="px-2 py-0.5 text-xs font-bold text-slate-700 bg-amber-50 border-b border-slate-200 text-center">档案状况</div>
+          <div className="grid grid-cols-4 divide-x divide-slate-200">
+            {VCF('案卷类型', 'archiveType')}
+            {VCF('文字(张)', 'textPage')}
+            {VCF('图纸(张)', 'drawingNum')}
+            {VCF('底图(张)', 'statDrawingBase')}
+          </div>
+          <div className="grid grid-cols-4 divide-x divide-slate-200 border-t border-slate-200">
+            {VCF('照片(张)', 'statPhoto')}
+            {VCF('录音带(盒)', 'statAudio')}
+            {VCF('录像带(盒)', 'statVideo')}
+            {VCF('光盘(张)', 'statDisk')}
+          </div>
+          <div className="grid grid-cols-4 divide-x divide-slate-200 border-t border-slate-200">
+            {VCF('磁盘(张)', 'statFloppyDisk')}
+            {VCF('缩微片', 'statMicro')}
+            {VCF('其他', 'statOther')}
+            <div />
+          </div>
+        </div>
+
+        {/* 备注 */}
+        <div>
+          <div className="px-2 py-0.5 text-xs font-bold text-slate-700 bg-amber-50 border-b border-slate-200 text-center">备注</div>
+          <div className="flex">
+            <div className="w-[100px] shrink-0 bg-sky-50 px-1.5 py-1 text-xs font-semibold text-slate-700 border-r border-slate-200 flex items-center justify-center text-center">备注</div>
+            <div className="flex-1 px-1.5 py-1 bg-white"><textarea defaultValue={data.notes || ''} rows={1} className="w-full border-0 bg-transparent outline-none text-xs resize-none text-slate-800" /></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── File-level form ───
+
+function FileForm({ data }: { data: Record<string, string> }) {
+  const FCF = (label: string, key: string) => (
+    <div className="flex">
+      <div className="w-[100px] shrink-0 bg-sky-50 px-1.5 py-1 text-xs font-semibold text-slate-700 border-r border-slate-200 flex items-center justify-center text-center whitespace-nowrap">{label}</div>
+      <div className="flex-1 px-1.5 py-1 bg-white"><input type="text" defaultValue={data[key] || ''} className="w-full border-0 bg-transparent outline-none text-xs text-slate-800" /></div>
+    </div>
+  );
+  return (
+    <div className="border border-slate-200 rounded-lg overflow-hidden bg-white">
+      <div className="divide-y divide-slate-200">
+        {/* 文件基本信息 */}
+        <div>
+          <div className="px-2 py-0.5 text-xs font-bold text-white bg-slate-500 border-b border-slate-200 text-center">文件基本信息</div>
+          <div className="flex border-b border-slate-200">
+            <div className="w-[100px] shrink-0 bg-sky-50 px-1.5 py-1 text-xs font-semibold text-slate-700 border-r border-slate-200 flex items-center justify-center text-center whitespace-nowrap">文件题名</div>
+            <div className="flex-1 px-1.5 py-1 bg-white"><textarea defaultValue={data.fileTitle || ''} rows={1} className="w-full border-0 bg-transparent outline-none text-xs resize-none text-slate-800" /></div>
+          </div>
+          <div className="grid grid-cols-2 divide-x divide-slate-200">
+            {FCF('档号', 'docNo')}
+            {FCF('文(图)号', 'archiveNo')}
+          </div>
+          <div className="grid grid-cols-3 divide-x divide-slate-200 border-t border-slate-200">
+            {FCF('责任者', 'responsible')}
+            {FCF('缩微号', 'microNo')}
+            {FCF('文本', 'text')}
+          </div>
+        </div>
+
+        {/* 存放处 */}
+        <div>
+          <div className="px-2 py-0.5 text-xs font-bold text-white bg-slate-500 border-b border-slate-200 text-center">存放处</div>
+          <div className="grid grid-cols-4 divide-x divide-slate-200">
+            {FCF('库', 'storageRoom')}
+            {FCF('列', 'storageColumn')}
+            {FCF('节(柜)', 'storageSection')}
+            {FCF('层', 'storageLevel')}
+          </div>
+        </div>
+
+        {/* 保管信息 */}
+        <div>
+          <div className="px-2 py-0.5 text-xs font-bold text-white bg-slate-500 border-b border-slate-200 text-center">保管信息</div>
+          <div className="grid grid-cols-4 divide-x divide-slate-200">
+            {FCF('保管期限', 'retention')}
+            {FCF('密级', 'secretLevel')}
+            {FCF('形成时间', 'date')}
+            {FCF('载体类型', 'carrierType')}
+          </div>
+        </div>
+
+        {/* 物理形态 */}
+        <div>
+          <div className="px-2 py-0.5 text-xs font-bold text-white bg-slate-500 border-b border-slate-200 text-center">物理形态</div>
+          <div className="grid grid-cols-3 divide-x divide-slate-200">
+            {FCF('数量', 'quantity')}
+            {FCF('单位', 'unit')}
+            {FCF('规格', 'specs')}
+          </div>
+          <div className="grid grid-cols-3 divide-x divide-slate-200 border-t border-slate-200">
+            {FCF('起始页', 'startPage')}
+            {FCF('结束页', 'endPage')}
+            {FCF('页次', 'pages')}
+          </div>
+        </div>
+
+        {/* 其他 */}
+        <div>
+          <div className="px-2 py-0.5 text-xs font-bold text-white bg-slate-500 border-b border-slate-200 text-center">其他</div>
+          <div className="grid grid-cols-3 divide-x divide-slate-200">
+            {FCF('提要', 'summary')}
+            {FCF('主题词', 'keywords')}
+            {FCF('附注', 'notes')}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Component ───
 
 export const Step3Catalog: React.FC<Step3CatalogProps> = ({ treeData, selectedNode, onSelectNode, onComplete, onGoToArchive, onCancel }) => {
@@ -234,8 +716,8 @@ export const Step3Catalog: React.FC<Step3CatalogProps> = ({ treeData, selectedNo
   const categories = FIELD_MAP[selectedNode.type] || [];
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden" style={{ height: 'calc(100vh - 160px)' }}>
-      <div className="flex justify-between items-center px-6 py-3 border-b border-slate-200 bg-slate-50">
+    <div className="flex flex-col h-full">
+      <div className="flex justify-between items-center px-6 py-3 border-b border-slate-200 bg-slate-50/50">
         <div>
           <h3 className="text-sm font-bold text-slate-800">档案著录</h3>
           <p className="text-[11px] text-slate-500">请完善各层级元数据信息</p>
@@ -250,60 +732,68 @@ export const Step3Catalog: React.FC<Step3CatalogProps> = ({ treeData, selectedNo
           </button>
         </div>
       </div>
-      <div className="flex" style={{ height: 'calc(100% - 46px)' }}>
-        <div className="w-72 border-r border-slate-200 bg-white overflow-y-auto flex-shrink-0">
+      <div className="flex flex-1 min-h-0">
+        <div className="w-56 border-r border-slate-200 bg-white overflow-y-auto flex-shrink-0">
           <div className="p-2.5 text-[11px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50 border-b border-slate-100 sticky top-0">档案目录结构</div>
           <div className="py-1">{renderTree(treeData)}</div>
         </div>
-        <div className="flex-1 bg-slate-50/50 p-6 overflow-y-auto">
-          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-6">
-            <div className="pb-4 border-b border-slate-100">
-              <span className={`text-[11px] font-bold px-2 py-0.5 rounded ${
+        <div className="flex-1 bg-slate-50/50 pl-3 py-3 overflow-y-auto">
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
+              <span className={`text-xs font-bold px-2 py-0.5 rounded ${
                 selectedNode.type === 'PROJECT' ? 'bg-blue-100 text-blue-700' :
                 selectedNode.type === 'UNIT' ? 'bg-indigo-100 text-indigo-700' :
                 selectedNode.type === 'VOLUME' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-700'
               }`}>
-                {selectedNode.type === 'PROJECT' ? '项目级著录' :
-                 selectedNode.type === 'UNIT' ? '工程级著录' :
-                 selectedNode.type === 'VOLUME' ? '案卷级著录' : '文件级著录'}
+                {selectedNode.type === 'PROJECT' ? '项目级' :
+                 selectedNode.type === 'UNIT' ? '工程级' :
+                 selectedNode.type === 'VOLUME' ? '案卷级' : '文件级'}
               </span>
-              <h3 className="text-base font-bold text-slate-800 mt-1">{selectedNode.label}</h3>
+              <h3 className="text-sm font-bold text-slate-800 truncate">{selectedNode.label}</h3>
             </div>
 
-            {categories.map((cat, ci) => (
-              <div key={ci} className="border border-slate-300 rounded-lg overflow-hidden">
-                <div className={`px-3 py-1.5 text-xs font-bold tracking-wider text-slate-800 ${
-                  selectedNode.type === 'PROJECT' ? 'bg-sky-100' :
-                  selectedNode.type === 'UNIT' ? 'bg-emerald-100' :
-                  selectedNode.type === 'VOLUME' ? 'bg-orange-100' :
-                  'bg-slate-500 text-white'
-                }`}>
-                  {cat.name}
-                </div>
-                <div className="grid grid-cols-2 divide-x divide-slate-200 bg-blue-50/40">
-                  {cat.fields.map((f, fi) => (
-                    <div key={f.key} className={`flex border-b border-slate-200 ${fi % 2 === 1 ? '' : ''}`}>
-                      <div className="w-[120px] shrink-0 bg-blue-50/80 px-2.5 py-2 text-[11px] font-semibold text-slate-700 border-r border-slate-200 flex items-center">
-                        {f.label}
+            {selectedNode.type === 'PROJECT' ? (
+              <ProjectForm data={selectedNode.data} />
+            ) : selectedNode.type === 'UNIT' ? (
+              <UnitForm data={selectedNode.data} />
+            ) : selectedNode.type === 'VOLUME' ? (
+              <VolumeForm data={selectedNode.data} />
+            ) : selectedNode.type === 'FILE' ? (
+              <FileForm data={selectedNode.data} />
+            ) : (
+              categories.map((cat, ci) => (
+                <div key={ci} className="border border-slate-200 rounded-lg overflow-hidden">
+                  <div className={`px-3 py-1 text-xs font-bold tracking-wider text-slate-800 ${
+                    selectedNode.type === 'UNIT' ? 'bg-emerald-100' :
+                    selectedNode.type === 'VOLUME' ? 'bg-amber-50' :
+                    'bg-slate-500 text-white'
+                  }`}>
+                    {cat.name}
+                  </div>
+                  <div className="grid grid-cols-2 divide-x divide-slate-200 bg-sky-50/40">
+                    {cat.fields.map((f) => (
+                      <div key={f.key} className="flex">
+                        <div className="w-[100px] shrink-0 bg-sky-50 px-2 py-1.5 text-[11px] font-semibold text-slate-700 border-r border-slate-200 flex items-center">
+                          {f.label}
+                        </div>
+                        <div className="flex-1 px-2 py-1 bg-white">
+                          {f.isTextarea ? (
+                            <textarea defaultValue={selectedNode.data[f.key] || ''} rows={1}
+                              className="w-full border-0 bg-transparent outline-none text-xs resize-none text-slate-800" />
+                          ) : (
+                            <input type="text" defaultValue={selectedNode.data[f.key] || ''}
+                              className="w-full border-0 bg-transparent outline-none text-xs text-slate-800" />
+                          )}
+                        </div>
                       </div>
-                      <div className="flex-1 px-2.5 py-1.5 bg-white">
-                        {f.isTextarea ? (
-                          <textarea defaultValue={selectedNode.data[f.key] || ''} rows={2}
-                            className="w-full border-0 bg-transparent outline-none text-xs resize-none text-slate-800" />
-                        ) : (
-                          <input type="text" defaultValue={selectedNode.data[f.key] || ''}
-                            className="w-full border-0 bg-transparent outline-none text-xs text-slate-800" />
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                  {/* Fill empty cell if odd number of fields */}
-                  {cat.fields.length % 2 === 1 && (
-                    <div className="border-b border-slate-200" />
-                  )}
+                    ))}
+                    {cat.fields.length % 2 === 1 && (
+                      <div className="border-b border-slate-200" />
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
       </div>

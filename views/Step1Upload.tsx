@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { FileText, Eye, RotateCcw, Search, Edit3, Database } from 'lucide-react';
+import { FileText, Upload, Eye, RotateCcw, Search, Edit3, Database } from 'lucide-react';
 import { IngestTask } from '../types';
 
 interface Step1UploadProps {
@@ -94,7 +94,17 @@ export const Step1Upload: React.FC<Step1UploadProps> = ({
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="px-6 py-3 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
           <h3 className="font-semibold text-slate-700 text-sm">上传记录</h3>
-          <span className="bg-slate-200 text-slate-600 text-xs px-2 py-1 rounded-full">{tasks.length} 项</span>
+          <div className="flex items-center gap-3">
+            <span className="bg-slate-200 text-slate-600 text-xs px-2 py-1 rounded-full">{tasks.length} 项</span>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg flex items-center shadow-lg shadow-blue-600/20 transition-all text-xs font-medium"
+            >
+              <Upload size={13} className="mr-1.5" />
+              上传档案包
+            </button>
+            <input type="file" ref={fileInputRef} className="hidden" multiple onChange={onFileUpload} />
+          </div>
         </div>
         {tasks.length === 0 ? (
           <div className="p-12 text-center text-slate-400">

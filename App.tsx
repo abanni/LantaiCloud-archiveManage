@@ -134,7 +134,7 @@ const App: React.FC = () => {
             onLogout={() => setCurrentUser(null)}
           />
         </div>
-        <div className="flex-1 overflow-y-auto px-6 pt-6 space-y-6">
+        <div className="flex-1 overflow-y-auto px-6 pt-3 space-y-6">
           {renderContent()}
         </div>
       </main>
