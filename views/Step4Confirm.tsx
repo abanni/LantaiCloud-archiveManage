@@ -25,7 +25,7 @@ function pad(n: string, w = 3): string {
   return String(n).padStart(w, '0');
 }
 
-// Build full tree from JSON with 4 levels
+// Build full tree from JSON with 4 levels (codes initially empty)
 function buildArchiveTree(): TreeItem[] {
   const items = archiveData as any[];
   const projectNode = items.find((item: any) => item.tag === 'zj' && item.parent_id === '0');
@@ -39,18 +39,13 @@ function buildArchiveTree(): TreeItem[] {
     id: projectNode.file_id,
     title: projectNode.file_name,
     level: '项目级',
-    archiveCode: projCode,
+    archiveCode: '-',
     totalRegNo: '-',
     classSerialNo: '-',
     volumeCode: '-',
     expanded: true,
     children: [],
   };
-
-  // Running counters for volume-only fields
-  let regNoCounter = 507575;
-  let classSerialCounter = 281607;
-  let volCodeCounter = 193607;
 
   // Unit level
   const units = items.filter((item: any) => item.tag === 'zj_item' && item.parent_id === projectNode.file_id);
@@ -64,7 +59,7 @@ function buildArchiveTree(): TreeItem[] {
       id: unit.file_id,
       title: unit.file_name,
       level: '工程级',
-      archiveCode: unitCode,
+      archiveCode: '-',
       totalRegNo: '-',
       classSerialNo: '-',
       volumeCode: '-',
@@ -84,10 +79,10 @@ function buildArchiveTree(): TreeItem[] {
         id: vol.file_id,
         title: vol.file_name,
         level: '案卷级',
-        archiveCode: volCode,
-        totalRegNo: String(regNoCounter++),
-        classSerialNo: `I-${classSerialCounter++}`,
-        volumeCode: `I1-1-${volCodeCounter++}`,
+        archiveCode: '-',
+        totalRegNo: '-',
+        classSerialNo: '-',
+        volumeCode: '-',
         expanded: false,
         children: [],
       };
@@ -102,7 +97,7 @@ function buildArchiveTree(): TreeItem[] {
           id: file.file_id,
           title: file.file_name || file.original_name || '未命名文件',
           level: '文件级',
-          archiveCode: `${volCode}-${fOrder}`,
+          archiveCode: '-',
           totalRegNo: '-',
           classSerialNo: '-',
           volumeCode: '-',
@@ -118,10 +113,53 @@ function buildArchiveTree(): TreeItem[] {
   return [projectItem];
 }
 
+// Generate codes for all nodes in the tree (returns a new tree)
+function generateCodes(tree: TreeItem[]): TreeItem[] {
+  const projSerial = '029605';
+  const projCode = `I1-1-${projSerial}`;
+  let regNoCounter = 507575;
+  let classSerialCounter = 281607;
+  let volCodeCounter = 193607;
+
+  const walk = (nodes: TreeItem[], parentCode: string): TreeItem[] => {
+    return nodes.map((node, idx) => {
+      if (node.level === '项目级') {
+        return { ...node, archiveCode: projCode, children: walk(node.children || [], projCode) };
+      }
+      if (node.level === '工程级') {
+        const order = (idx + 1).toString().padStart(3, '0');
+        const code = `${parentCode}-${order}`;
+        return { ...node, archiveCode: code, children: walk(node.children || [], code) };
+      }
+      if (node.level === '案卷级') {
+        const order = (idx + 1).toString().padStart(3, '0');
+        const code = `${parentCode}-${order}`;
+        return {
+          ...node,
+          archiveCode: code,
+          totalRegNo: String(regNoCounter++),
+          classSerialNo: `I-${classSerialCounter++}`,
+          volumeCode: `I1-1-${volCodeCounter++}`,
+          children: walk(node.children || [], code),
+        };
+      }
+      if (node.level === '文件级') {
+        const order = (idx + 1).toString().padStart(3, '0');
+        return { ...node, archiveCode: `${parentCode}-${order}` };
+      }
+      return node;
+    });
+  };
+
+  return walk(tree, '');
+}
+
 export const Step4Confirm: React.FC<Step4ConfirmProps> = ({ taskName, onReturn, onConfirm }) => {
   const [majorId, setMajorId] = useState<number>(0);
   const [subId, setSubId] = useState<number>(0);
   const [detailId, setDetailId] = useState<number>(0);
+  const [codesGenerated, setCodesGenerated] = useState(false);
+  const [treeData, setTreeData] = useState<TreeItem[]>(() => buildArchiveTree());
   const [expandedIds, setExpandedIds] = useState<string[]>(() => {
     // Default: PROJECT(0), UNIT(1), VOLUME(2) expanded; FILE(3) collapsed
     const result: string[] = [];
@@ -139,14 +177,40 @@ export const Step4Confirm: React.FC<Step4ConfirmProps> = ({ taskName, onReturn, 
   const majorTypes = getMajorTypes();
   const subTypes = majorId > 0 ? getSubTypes(majorId) : [];
   const detailTypes = subId > 0 ? getDetailTypes(subId) : [];
-  const showDetail = subId > 0 && hasChildren(subId);
 
   const selectedMajor = majorId > 0 ? findById(majorId) : null;
   const selectedSub = subId > 0 ? findById(subId) : null;
   const selectedDetail = detailId > 0 ? findById(detailId) : null;
 
-  const handleMajorChange = (id: number) => { setMajorId(id); setSubId(0); setDetailId(0); };
-  const handleSubChange = (id: number) => { setSubId(id); setDetailId(0); };
+  // Check if enough archive types are selected
+  const typesComplete = ((): boolean => {
+    if (majorId <= 0) return false;
+    if (hasChildren(majorId) && subId <= 0) return false;
+    if (subId > 0 && hasChildren(subId) && detailId <= 0) return false;
+    return true;
+  })();
+
+  const handleMajorChange = (id: number) => { setMajorId(id); setSubId(0); setDetailId(0); setCodesGenerated(false); };
+  const handleSubChange = (id: number) => { setSubId(id); setDetailId(0); setCodesGenerated(false); };
+  const handleDetailChange = (id: number) => { setDetailId(id); setCodesGenerated(false); };
+
+  const handleGenerateCodes = () => {
+    const base = buildArchiveTree();
+    const coded = generateCodes(base);
+    setTreeData(coded);
+    setCodesGenerated(true);
+  };
+
+  const handleResetCodes = () => {
+    setTreeData(buildArchiveTree());
+    setCodesGenerated(false);
+  };
+
+  const handleConfirm = () => {
+    if (codesGenerated) {
+      onConfirm();
+    }
+  };
 
   const toggleExpand = useCallback((id: string) => {
     setExpandedIds(prev =>
@@ -156,7 +220,7 @@ export const Step4Confirm: React.FC<Step4ConfirmProps> = ({ taskName, onReturn, 
 
   const isExpanded = (id: string) => expandedIds.includes(id);
 
-  const tree = useMemo(() => buildArchiveTree(), []);
+  const tree = treeData;
 
   // Count all items (for the badge)
   const totalCount = useMemo(() => {
@@ -231,7 +295,7 @@ export const Step4Confirm: React.FC<Step4ConfirmProps> = ({ taskName, onReturn, 
             </div>
             <div>
               <label className="block text-[11px] font-medium text-slate-600 mb-1">三类</label>
-              <select value={detailId} onChange={(e) => setDetailId(Number(e.target.value))}
+              <select value={detailId} onChange={(e) => handleDetailChange(Number(e.target.value))}
                 disabled={detailTypes.length === 0}
                 className="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white outline-none focus:border-blue-500">
                 <option value={0}>-- 请选择三类 --</option>
@@ -240,8 +304,21 @@ export const Step4Confirm: React.FC<Step4ConfirmProps> = ({ taskName, onReturn, 
             </div>
           </div>
           {selectedMajor && (
-            <div className="mt-3 pt-3 border-t border-yellow-200/60 text-[11px] text-slate-600">
-              已选：<span className="bg-white px-2 py-0.5 rounded border border-yellow-200 text-amber-700 font-medium">{formatTypePath(majorId, subId || undefined, detailId || undefined)}</span>
+            <div className="mt-3 pt-3 border-t border-yellow-200/60 flex items-center justify-between">
+              <div className="text-[11px] text-slate-600">
+                已选：<span className="bg-white px-2 py-0.5 rounded border border-yellow-200 text-amber-700 font-medium">{formatTypePath(majorId, subId || undefined, detailId || undefined)}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={handleGenerateCodes} disabled={!typesComplete || codesGenerated}
+                  className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-colors ${typesComplete && !codesGenerated ? 'bg-blue-600 text-white hover:bg-blue-700 shadow' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}>
+                  更新档号
+                </button>
+                <button onClick={handleResetCodes}
+                  disabled={!codesGenerated}
+                  className={`px-4 py-1.5 text-xs font-bold rounded-lg border transition-colors ${codesGenerated ? 'border-slate-200 text-slate-600 bg-white hover:bg-slate-50' : 'border-slate-100 text-slate-300 bg-slate-50 cursor-not-allowed'}`}>
+                  重置
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -266,8 +343,9 @@ export const Step4Confirm: React.FC<Step4ConfirmProps> = ({ taskName, onReturn, 
                 className="px-3 py-1.5 border border-slate-200 bg-white text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-50 transition-colors">
                 取消
               </button>
-              <button onClick={onConfirm}
-                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow transition-colors">
+              <button onClick={handleConfirm}
+                disabled={!codesGenerated}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold shadow transition-colors ${codesGenerated ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}>
                 确认入库
               </button>
             </div>
@@ -334,8 +412,9 @@ export const Step4Confirm: React.FC<Step4ConfirmProps> = ({ taskName, onReturn, 
             className="px-5 py-2 border border-slate-200 bg-white text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-50 transition-colors flex items-center gap-1.5">
             <X size={14} /> 取消
           </button>
-          <button onClick={onConfirm}
-            className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow transition-colors flex items-center gap-1.5">
+          <button onClick={handleConfirm}
+            disabled={!codesGenerated}
+            className={`px-5 py-2 rounded-lg text-xs font-bold shadow transition-colors flex items-center gap-1.5 ${codesGenerated ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}>
             <Check size={14} /> 确认入库
           </button>
         </div>

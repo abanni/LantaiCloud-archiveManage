@@ -21,8 +21,8 @@ export interface UtilizationRecord {
 const ARCHIVE_TYPES = ['工程档案', '招投标档案', '音像档案', '村镇档案', '文书档案'];
 const CARRIER_TYPES = ['竣工图纸', '文字卷宗', '工程照片', '光盘介质'];
 const SECURITY_LEVELS = ['普通', '秘密', '机密', '绝密'];
-const USER_IDENTITIES = ['建设/施工单位', '律师/法律工作者', '党政/司法机关', '房屋产权人', '物业单位', '其他'];
-const PURPOSES = ['解决纠纷', '调查取证', '领取房产证', '生产建设', '查阅核对'];
+const USER_IDENTITIES = ['建设单位', '施工单位', '产权单位', '律师', '物业单位', '房屋产权人', '党政/纪检/司法机关', '其他'];
+const PURPOSES = ['复印备案', '领取房产证', '生产建设', '解决纠纷', '查阅核对', '调查取证', '其他'];
 
 // ===== 权重随机选择 =====
 function weightedRandom<T>(items: T[], weights: number[]): T {
@@ -89,8 +89,8 @@ function generateUtilizationRecords(): UtilizationRecord[] {
       records.push({
         date: formatDate(recordDate),
         method: weightedRandom(['download', 'print', 'view'], [40, 25, 35]),
-        userIdentity: weightedRandom(USER_IDENTITIES, [30, 20, 15, 20, 10, 5]),
-        purpose: weightedRandom(PURPOSES, [25, 20, 30, 15, 10]),
+        userIdentity: weightedRandom(USER_IDENTITIES, [25, 20, 5, 10, 5, 15, 15, 5]),
+        purpose: weightedRandom(PURPOSES, [20, 15, 15, 15, 15, 10, 10]),
       });
     }
     current.setMonth(current.getMonth() + 1);
@@ -244,4 +244,20 @@ export function calcSummary(ingest: IngestRecord[], utilization: UtilizationReco
   const paperlessRate = totalUtilization > 0 ? ((downloads / totalUtilization) * 100).toFixed(1) : '0';
 
   return { totalVolumes, totalUtilization, downloads, prints, paperlessRate };
+}
+
+/** 新增项目/工程/案卷/文件统计 */
+export function calcNewCounts(archiveData: any[]) {
+  const projects = archiveData.filter((i: any) => i.tag === 'zj' && i.parent_id === '0').length;
+  const units = archiveData.filter((i: any) => i.tag === 'zj_item').length;
+  const volumes = archiveData.filter((i: any) => i.tag === 'zj_volume').length;
+  const files = archiveData.filter((i: any) => i.file_type === 'file').length;
+  return { projects, units, volumes, files };
+}
+
+/** 载体类型详细统计 */
+export function calcCarrierDetail() {
+  const colors = ['#3b82f6', '#10b981', '#a855f7', '#ec4899', '#f59e0b', '#6366f1', '#06b6d4', '#f43f5e', '#84cc16', '#d946ef', '#94a3b8'];
+  const types = ['文字', '图纸', '照片', '底图', '录音带', '录像带', '光盘', '磁带', '磁盘', '缩微片', '其他'];
+  return types.map((name, i) => ({ name, 卷数: Math.floor(Math.random() * 500) + 50, color: colors[i] }));
 }
