@@ -291,7 +291,7 @@ export const SearchModule: React.FC<SearchModuleProps> = ({ basket, setBasket, o
                 <div className="absolute inset-0 z-10 pointer-events-none flex items-center justify-center opacity-10 select-none overflow-hidden" 
                      style={{ transform: 'rotate(-45deg) scale(1.5)' }}>
                   <div className="text-4xl font-black text-slate-900 whitespace-nowrap">
-                    机密档案 • 仅供利用 • 兰台云档案馆 • 
+                    机密档案 • 仅供利用 • 兰台云-数智馆藏 • 
                   </div>
                 </div>
                 <div className="w-full h-full bg-white shadow-2xl border border-slate-200 p-8 text-[10px] text-slate-800 leading-relaxed overflow-hidden">
