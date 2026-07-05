@@ -3,3 +3,5 @@ node_modules
 # Backup files
 .backup_*
 .hermes.md
+*.pdf
+.DS_Store

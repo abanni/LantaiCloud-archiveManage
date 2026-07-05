@@ -2,9 +2,27 @@ import React, { useState, useMemo } from 'react';
 import { IngestTask } from '../types';
 import { Step1Upload } from './Step1Upload';
 import { Step2Inspection } from './Step2Inspection';
-import { Step3Catalog } from './Step3Catalog';
+import { Step3Catalog, Step3CatalogProps } from './Step3Catalog';
 import { Step4Confirm } from './Step4Confirm';
 import archiveData from '../data/archiveData.json';
+
+const LOCAL_FILE_KEY = 'lantai_file_changes';
+
+// localStorage file operations
+function getLocalChanges(): Record<string, any> {
+  try {
+    return JSON.parse(localStorage.getItem(LOCAL_FILE_KEY) || '{}');
+  } catch { return {}; }
+}
+
+function saveLocalChanges(changes: Record<string, any>) {
+  localStorage.setItem(LOCAL_FILE_KEY, JSON.stringify(changes));
+}
+
+// 生成唯一ID
+function genId(): string {
+  return 'file_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 8);
+}
 
 // 模拟数据
 const MOCK_TASKS: IngestTask[] = [
@@ -150,16 +168,22 @@ const MOCK_TASKS: IngestTask[] = [
   }
 ];
 
-// 从JSON数据构建树结构
+// 从JSON数据构建树结构（合并localStorage增量）
 function buildTreeFromJson() {
   const items = archiveData as any[];
+  const changes = getLocalChanges();
+  const addedFiles = (changes.added || []) as any[];
+  const deletedFileIds = new Set<string>(changes.deleted || []);
+  const updatedFiles = (changes.updated || {}) as Record<string, any>;
+  const sortOrder = (changes.sortOrder || {}) as Record<string, string[]>;
   
   // 找到项目级节点
   const projectNode = items.find(item => item.tag === 'zj' && item.parent_id === '0');
   if (!projectNode) return null;
 
   // 找到工程级节点
-  const engineeringNodes = items.filter(item => item.tag === 'zj_item' && item.parent_id === projectNode.file_id);
+  const engineeringNodes = items.filter(item => item.tag === 'zj_item' && item.parent_id === projectNode.file_id)
+    .sort((a: any, b: any) => (parseInt(a.order_no) || 0) - (parseInt(b.order_no) || 0));
 
   const buildNode = (item: any, level: number): any => {
     const typeMap: Record<string, string> = {
@@ -175,32 +199,85 @@ function buildTreeFromJson() {
       children = engineeringNodes.map(eng => buildNode(eng, 1));
     } else if (level === 1) {
       // 工程级 - 添加案卷级子节点
-      const volumeNodes = items.filter(i => i.tag === 'zj_volume' && i.parent_id === item.file_id);
+      const volumeNodes = items.filter(i => i.tag === 'zj_volume' && i.parent_id === item.file_id)
+        .sort((a: any, b: any) => (parseInt(a.order_no) || 0) - (parseInt(b.order_no) || 0));
       children = volumeNodes.map(vol => buildNode(vol, 2));
     } else if (level === 2) {
-      // 案卷级 - 添加文件级子节点
-      const fileNodes = items.filter(i => i.tag === '' && i.file_type === 'file' && i.parent_id === item.file_id);
-      children = fileNodes.map(file => ({
-        id: file.file_id,
-        type: 'FILE',
-        label: file.file_name,
-        data: {
-          docNo: file.doc_no || '',
-          archiveNo: file.archive_no || '',
-          fileTitle: file.file_name,
-          responsible: file.compilation_company || '',
-          date: file.input_time || '',
-          pages: file.text_page || '',
-          url: file.url || '',
+      // 案卷级 - 添加文件级子节点（原始数据 + localStorage新增）
+      const fileNodes = items
+        .filter(i => i.tag === '' && i.file_type === 'file' && i.parent_id === item.file_id)
+        .filter(i => !deletedFileIds.has(i.file_id))
+        .map(file => {
+          const upd = updatedFiles[file.file_id] || {};
+          return {
+            id: file.file_id,
+            type: 'FILE' as const,
+            label: file.file_name,
+            data: {
+              docNo: upd.docNo || file.doc_no || '',
+              archiveNo: upd.archiveNo || file.archive_no || '',
+              fileTitle: upd.fileTitle || file.file_name,
+              responsible: upd.responsible || file.compilation_company || '',
+              microNo: upd.microNo || '',
+              text: upd.text || '',
+              storageRoom: upd.storageRoom || '',
+              storageColumn: upd.storageColumn || '',
+              storageSection: upd.storageSection || '',
+              storageLevel: upd.storageLevel || '',
+              retention: upd.retention || file.storage_period || '',
+              secretLevel: upd.secretLevel || file.secrecy_level || '',
+              date: upd.date || file.input_time || '',
+              carrierType: upd.carrierType || '',
+              quantity: upd.quantity || '',
+              unit: upd.unit || '',
+              specs: upd.specs || '',
+              startPage: upd.startPage || '',
+              endPage: upd.endPage || '',
+              pages: upd.pages || file.text_page || '',
+              summary: upd.summary || '',
+              keywords: upd.keywords || '',
+              notes: upd.notes || '',
+              url: window.location.origin + '/DemoFile1.pdf',
+            }
+          };
+        })
+        .sort((a: any, b: any) => (parseInt(a.order_no) || 0) - (parseInt(b.order_no) || 0));
+
+      // 合并新增文件
+      const volumeAdded = addedFiles
+        .filter((f: any) => f.parentId === item.file_id)
+        .map((f: any) => ({
+          id: f.id,
+          type: 'FILE' as const,
+          label: f.data.fileTitle || '未命名文件',
+          data: { ...f.data },
+          _isNew: true,
+        }));
+
+      children = [...fileNodes, ...volumeAdded];
+
+      // 如果有自定义排序顺序，按排序顺序排列
+      const orderKey = item.file_id;
+      if (sortOrder[orderKey]) {
+        const orderMap = new Map(children.map(c => [c.id, c]));
+        const sorted: any[] = [];
+        for (const id of sortOrder[orderKey]) {
+          if (orderMap.has(id)) {
+            sorted.push(orderMap.get(id));
+            orderMap.delete(id);
+          }
         }
-      }));
+        // 把剩余未在排序列表中的追加到末尾
+        for (const c of orderMap.values()) sorted.push(c);
+        children = sorted;
+      }
     }
 
     return {
       id: item.file_id,
       type: typeMap[item.tag] || 'FILE',
       label: item.file_name,
-      expanded: level <= 1, // 项目级、工程级展开；案卷级可见不展开，文件级折叠
+      expanded: level <= 1,
       data: {
         // 通用字段
         projectName: item.file_name,
@@ -268,6 +345,131 @@ export const IngestModule: React.FC = () => {
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
   const [treeData, setTreeData] = useState(INITIAL_TREE_DATA);
   const [selectedNode, setSelectedNode] = useState(INITIAL_TREE_DATA);
+
+  // ─── File management ───
+  const rebuildTree = () => {
+    setTreeData(buildTreeFromJson() || INITIAL_TREE_DATA);
+  };
+
+  const handleDeleteFile = (fileId: string) => {
+    const changes = getLocalChanges();
+    const deleted = changes.deleted || [];
+    if (!deleted.includes(fileId)) {
+      deleted.push(fileId);
+    }
+    changes.deleted = deleted;
+    saveLocalChanges(changes);
+    rebuildTree();
+    // 如果删除的是当前选中节点，清空选中
+    if (selectedNode.id === fileId) {
+      setSelectedNode(treeData);
+    }
+  };
+
+  const handleReplacePdf = (fileId: string, dataUrl: string) => {
+    const changes = getLocalChanges();
+    const updated = changes.updated || {};
+    updated[fileId] = { ...(updated[fileId] || {}), url: dataUrl };
+    changes.updated = updated;
+    saveLocalChanges(changes);
+    rebuildTree();
+  };
+
+  const handleUpdateFileMeta = (fileId: string, meta: Record<string, string>) => {
+    const changes = getLocalChanges();
+    const updated = changes.updated || {};
+    updated[fileId] = { ...(updated[fileId] || {}), ...meta };
+    changes.updated = updated;
+    saveLocalChanges(changes);
+    rebuildTree();
+  };
+
+  const handleAddFile = (parentVolumeId: string, meta: Record<string, string>, dataUrl: string) => {
+    const changes = getLocalChanges();
+    const added = changes.added || [];
+    const newId = genId();
+    added.push({
+      id: newId,
+      parentId: parentVolumeId,
+      data: { ...meta, url: dataUrl },
+    });
+    changes.added = added;
+    saveLocalChanges(changes);
+    rebuildTree();
+    // 选中新文件
+    setTimeout(() => {
+      const newTree = buildTreeFromJson();
+      if (newTree) {
+        const findNode = (node: any): any => {
+          if (node.id === newId) return node;
+          if (node.children) {
+            for (const c of node.children) {
+              const found = findNode(c);
+              if (found) return found;
+            }
+          }
+          return null;
+        };
+        const newNode = findNode(newTree);
+        if (newNode) {
+          setSelectedNode(newNode);
+          setTreeData(newTree);
+        }
+      }
+    }, 0);
+  };
+
+  const handleMoveFile = (fileId: string, direction: 'up' | 'down') => {
+    // 找到当前文件的父案卷ID
+    const findParentId = (): string | null => {
+      const walk = (nodes: any[], parentId: string | null): string | null => {
+        for (const n of nodes) {
+          if (n.id === fileId) return parentId;
+          if (n.children) {
+            const found = walk(n.children, n.id);
+            if (found) return found;
+          }
+        }
+        return null;
+      };
+      return walk(treeData.children || [], treeData.id);
+    };
+
+    const parentId = findParentId();
+    if (!parentId) return;
+
+    const changes = getLocalChanges();
+    const sortOrder = changes.sortOrder || {};
+    const orderKey = parentId;
+
+    // 构建当前文件列表顺序
+    const allFiles: string[] = [];
+    const walkFiles = (nodes: any[]) => {
+      for (const n of nodes) {
+        if (n.type === 'FILE') {
+          if (n._isNew || !changes.deleted?.includes(n.id)) {
+            allFiles.push(n.id);
+          }
+        }
+        if (n.children) walkFiles(n.children);
+      }
+    };
+    if (treeData.children) walkFiles(treeData.children);
+
+    const idx = allFiles.indexOf(fileId);
+    if (direction === 'up' && idx > 0) {
+      [allFiles[idx], allFiles[idx - 1]] = [allFiles[idx - 1], allFiles[idx]];
+    } else if (direction === 'down' && idx < allFiles.length - 1) {
+      [allFiles[idx], allFiles[idx + 1]] = [allFiles[idx + 1], allFiles[idx]];
+    } else {
+      return; // 已经到边界
+    }
+
+    sortOrder[orderKey] = allFiles;
+    changes.sortOrder = sortOrder;
+    saveLocalChanges(changes);
+    rebuildTree();
+  };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -392,6 +594,11 @@ export const IngestModule: React.FC = () => {
             onComplete={handleCatalogComplete}
             onGoToArchive={handleCatalogComplete}
             onCancel={handleBackToUpload}
+            onDeleteFile={handleDeleteFile}
+            onReplacePdf={handleReplacePdf}
+            onUpdateFileMeta={handleUpdateFileMeta}
+            onAddFile={handleAddFile}
+            onMoveFile={handleMoveFile}
           />
         )}
 

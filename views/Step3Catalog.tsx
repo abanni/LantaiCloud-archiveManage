@@ -13,13 +13,18 @@ interface MetadataNode {
   children?: MetadataNode[];
 }
 
-interface Step3CatalogProps {
+export interface Step3CatalogProps {
   treeData: MetadataNode;
   selectedNode: MetadataNode;
   onSelectNode: (node: MetadataNode) => void;
   onComplete: () => void;
   onGoToArchive: () => void;
   onCancel: () => void;
+  onDeleteFile?: (fileId: string) => void;
+  onReplacePdf?: (fileId: string, dataUrl: string) => void;
+  onUpdateFileMeta?: (fileId: string, meta: Record<string, string>) => void;
+  onAddFile?: (parentVolumeId: string, meta: Record<string, string>, dataUrl: string) => void;
+  onMoveFile?: (fileId: string, direction: 'up' | 'down') => void;
 }
 
 // ─── Field definitions ───
@@ -231,38 +236,32 @@ function FullRow({ label, value, data, fieldKey, isTextarea }: { label: string; 
 // ─── Project-level form ───
 
 function ProjectForm({ data }: { data: Record<string, string> }) {
-  const PCF = (label: string, key: string) => (
+  const PCF = (label: string, key: string, disabled?: boolean) => (
     <div className="flex">
       <div className="w-[110px] shrink-0 bg-sky-50 px-1.5 py-1 text-xs font-semibold text-slate-700 border-r border-slate-200 flex items-center justify-center text-center">{label}</div>
-      <div className="flex-1 px-1.5 py-1 bg-white"><input type="text" defaultValue={data[key] || ''} className="w-full border-0 bg-transparent outline-none text-xs text-slate-800" /></div>
+      <div className={`flex-1 px-1.5 py-1 ${disabled ? 'bg-slate-100' : 'bg-white'}`}>
+        <input type="text" defaultValue={data[key] || ''} disabled={disabled}
+          className="w-full border-0 bg-transparent outline-none text-xs text-slate-800 disabled:text-slate-400 disabled:cursor-not-allowed" />
+      </div>
     </div>
   );
   return (
     <div className="border border-slate-200 rounded-lg overflow-hidden bg-white">
       <div className="divide-y divide-slate-200">
-        {/* 工程名称 + 工程地点 */}
-        <div className="flex divide-x divide-slate-200">
-          <div className="flex-1 min-w-0">
+        {/* 基本信息 */}
+        <div>
+          <div className="px-2 py-0.5 text-xs font-bold text-slate-700 bg-blue-200 border-b border-slate-200 text-center">基本信息</div>
+          <div className="grid grid-cols-2 divide-x divide-slate-200">
             <div className="flex">
-              <div className="w-[100px] shrink-0 bg-sky-50 px-1.5 py-1 text-xs font-semibold text-slate-700 border-r border-slate-200 flex items-center justify-center text-center">工程名称</div>
+              <div className="w-[110px] shrink-0 bg-sky-50 px-1.5 py-1 text-xs font-semibold text-slate-700 border-r border-slate-200 flex items-center justify-center text-center">项目名称</div>
               <div className="flex-1 px-1.5 py-1 bg-white"><input type="text" defaultValue={data.projectName || ''} className="w-full border-0 bg-transparent outline-none text-xs text-slate-800" /></div>
             </div>
-          </div>
-          <div className="w-[300px] shrink-0">
             <div className="flex">
-              <div className="w-[80px] shrink-0 bg-sky-50 px-1.5 py-1 text-xs font-semibold text-slate-700 border-r border-slate-200 flex items-center justify-center text-center">工程地点</div>
+              <div className="w-[110px] shrink-0 bg-sky-50 px-1.5 py-1 text-xs font-semibold text-slate-700 border-r border-slate-200 flex items-center justify-center text-center">项目地点</div>
               <div className="flex-1 px-1.5 py-1 bg-white"><input type="text" defaultValue={data.address || ''} className="w-full border-0 bg-transparent outline-none text-xs text-slate-800" /></div>
             </div>
           </div>
-        </div>
-
-        {/* 责任者 + 文号项 */}
-        <div>
-          <div className="grid grid-cols-2 divide-x divide-slate-200">
-            <div className="px-2 py-0.5 text-xs font-bold text-slate-700 bg-blue-200 text-center">责任者</div>
-            <div className="px-2 py-0.5 text-xs font-bold text-slate-700 bg-blue-200 text-center">文号项</div>
-          </div>
-          <div className="divide-y divide-slate-200">
+          <div className="divide-y divide-slate-200 border-t border-slate-200">
             <div className="grid grid-cols-2 divide-x divide-slate-200">
               {PCF('建设单位', 'constructionUnit')}
               {PCF('立项批准文号', 'approvalNo')}
@@ -282,6 +281,16 @@ function ProjectForm({ data }: { data: Record<string, string> }) {
             <div className="grid grid-cols-2 divide-x divide-slate-200">
               {PCF('监理单位', 'supervisionUnit')}
               {PCF('施工许可证号', 'workPermitNo')}
+            </div>
+            <div className="grid grid-cols-2 divide-x divide-slate-200">
+              <div className="flex">
+                <div className="w-[110px] shrink-0 bg-sky-50 px-1.5 py-1 text-xs font-semibold text-slate-700 border-r border-slate-200 flex items-center justify-center text-center">移交单位</div>
+                <div className="flex-1 px-1.5 py-1 bg-white"><input type="text" defaultValue={data.handoverUnit || ''} className="w-full border-0 bg-transparent outline-none text-xs text-slate-800" /></div>
+              </div>
+              <div className="flex">
+                <div className="w-[110px] shrink-0 bg-sky-50 px-1.5 py-1 text-xs font-semibold text-slate-700 border-r border-slate-200 flex items-center justify-center text-center">质监号</div>
+                <div className="flex-1 px-1.5 py-1 bg-white"><input type="text" defaultValue={data.qualitySupervisionNo || ''} className="w-full border-0 bg-transparent outline-none text-xs text-slate-800" /></div>
+              </div>
             </div>
           </div>
         </div>
@@ -311,15 +320,7 @@ function ProjectForm({ data }: { data: Record<string, string> }) {
             <div className="w-[75px] shrink-0 px-1 py-0.5"><input type="text" defaultValue={data.startDate || ''} className="w-full border-0 bg-transparent outline-none text-xs text-slate-800 text-center" /></div>
             <div className="w-[75px] shrink-0 px-1 py-0.5"><input type="text" defaultValue={data.endDate || ''} className="w-full border-0 bg-transparent outline-none text-xs text-slate-800 text-center" /></div>
           </div>
-          {/* 财务汇总行 */}
-          <div className="grid grid-cols-5 divide-x divide-slate-200 border-t border-slate-200 border-b border-slate-200 bg-sky-50">
-            <div className="px-1 py-0.5 text-xs font-semibold text-slate-600 text-center">总用地面积</div>
-            <div className="px-1 py-0.5 text-xs font-semibold text-slate-600 text-center">总建筑面积</div>
-            <div className="px-1 py-0.5 text-xs font-semibold text-slate-600 text-center">幢数</div>
-            <div className="px-1 py-0.5 text-xs font-semibold text-slate-600 text-center">工程造价</div>
-            <div className="px-1 py-0.5 text-xs font-semibold text-slate-600 text-center">工程结算</div>
-          </div>
-          <div className="grid grid-cols-5 divide-x divide-slate-200">
+          <div className="grid grid-cols-5 divide-x divide-slate-200 border-t border-slate-200">
             {PCF('总用地面积', 'totalLandArea')}
             {PCF('总建筑面积', 'totalBuildingArea')}
             {PCF('幢数', 'buildingCount')}
@@ -335,11 +336,11 @@ function ProjectForm({ data }: { data: Record<string, string> }) {
             {PCF('总卷数', 'volCount')}
             {PCF('文字(卷)', 'textVol')}
             {PCF('图纸(卷)', 'drawingVol')}
-            {PCF('底图(张)', 'statDrawing')}
-            {PCF('竣工图(张)', 'statFinishedDrawing')}
+            {PCF('图纸(张)', 'statFinishedDrawing')}
+            {PCF('照片(张)', 'statPhoto')}
           </div>
           <div className="grid grid-cols-5 divide-x divide-slate-200 border-t border-slate-200">
-            {PCF('照片(张)', 'statPhoto')}
+            {PCF('底图(张)', 'statDrawing')}
             {PCF('录音带(盒)', 'statAudio')}
             {PCF('录像带(盒)', 'statVideo')}
             {PCF('光盘(张)', 'statDisk')}
@@ -350,23 +351,18 @@ function ProjectForm({ data }: { data: Record<string, string> }) {
         {/* 保管信息 */}
         <div>
           <div className="px-2 py-0.5 text-xs font-bold text-slate-700 bg-blue-200 border-b border-slate-200 text-center">保管信息</div>
-          <div className="grid grid-cols-4 divide-x divide-slate-200">
+          <div className="grid grid-cols-3 divide-x divide-slate-200">
             {PCF('保管期限', 'retention')}
             {PCF('密级', 'security')}
             {PCF('进馆日期', 'entryDate')}
-            <div className="flex">
-              <div className="w-[110px] shrink-0 bg-sky-50 px-1.5 py-1 text-xs font-semibold text-slate-700 border-r border-slate-200 flex items-center justify-center text-center">移交单位</div>
-              <div className="flex-1 px-1.5 py-1 bg-white"><input type="text" defaultValue={data.handoverUnit || ''} className="w-full border-0 bg-transparent outline-none text-xs text-slate-800" /></div>
-            </div>
           </div>
         </div>
 
         {/* 排检与编号 */}
         <div>
           <div className="px-2 py-0.5 text-xs font-bold text-slate-700 bg-blue-200 border-b border-slate-200 text-center">排检与编号</div>
-          <div className="grid grid-cols-3 divide-x divide-slate-200">
-            {PCF('档号', 'archiveCode')}
-            {PCF('质监号', 'qualitySupervisionNo')}
+          <div className="grid grid-cols-2 divide-x divide-slate-200">
+            {PCF('档号', 'archiveCode', true)}
             {PCF('存放位置起始号', 'storageStartNo')}
           </div>
         </div>
@@ -396,10 +392,13 @@ function ProjectForm({ data }: { data: Record<string, string> }) {
 // ─── Engineering-level form ───
 
 function UnitForm({ data }: { data: Record<string, string> }) {
-  const UCF = (label: string, key: string) => (
+  const UCF = (label: string, key: string, disabled?: boolean) => (
     <div className="flex">
-      <div className="w-[120px] shrink-0 bg-sky-50 px-1.5 py-1 text-xs font-semibold text-slate-700 border-r border-slate-200 flex items-center justify-center text-center">{label}</div>
-      <div className="flex-1 px-1.5 py-1 bg-white"><input type="text" defaultValue={data[key] || ''} className="w-full border-0 bg-transparent outline-none text-xs text-slate-800" /></div>
+      <div className="w-[120px] shrink-0 bg-sky-50 px-1.5 py-1 text-xs font-semibold text-slate-700 border-r border-slate-200 flex items-center justify-center text-center whitespace-nowrap">{label}</div>
+      <div className={`flex-1 px-1.5 py-1 ${disabled ? 'bg-slate-100' : 'bg-white'}`}>
+        <input type="text" defaultValue={data[key] || ''} disabled={disabled}
+          className="w-full border-0 bg-transparent outline-none text-xs text-slate-800 disabled:text-slate-400 disabled:cursor-not-allowed" />
+      </div>
     </div>
   );
   return (
@@ -448,10 +447,19 @@ function UnitForm({ data }: { data: Record<string, string> }) {
         {/* 档案状况 */}
         <div>
           <div className="px-2 py-0.5 text-xs font-bold text-slate-700 bg-emerald-100 border-b border-slate-200 text-center">档案状况</div>
-          <div className="grid grid-cols-3 divide-x divide-slate-200">
-            {UCF('案卷数', 'volCount')}
+          <div className="grid grid-cols-5 divide-x divide-slate-200">
+            {UCF('总卷数', 'volCount')}
             {UCF('文字(卷)', 'textVol')}
             {UCF('图纸(卷)', 'drawingVol')}
+            {UCF('底图(张)', 'statDrawing')}
+            {UCF('照片(张)', 'statPhoto')}
+          </div>
+          <div className="grid grid-cols-5 divide-x divide-slate-200 border-t border-slate-200">
+            {UCF('录音带(盒)', 'statAudio')}
+            {UCF('录像带(盒)', 'statVideo')}
+            {UCF('光盘(张)', 'statDisk')}
+            {UCF('计算机磁带(盒)', 'statFloppyDisk')}
+            {UCF('其他', 'statOther')}
           </div>
         </div>
 
@@ -473,12 +481,17 @@ function UnitForm({ data }: { data: Record<string, string> }) {
         <div>
           <div className="px-2 py-0.5 text-xs font-bold text-slate-700 bg-emerald-100 border-b border-slate-200 text-center">排检与编号</div>
           <div className="grid grid-cols-3 divide-x divide-slate-200">
-            {UCF('档号', 'archiveCode')}
+            {UCF('档号', 'archiveCode', true)}
             {UCF('缩微号', 'microNo')}
             {UCF('存放位置起始号', 'storageStartNo')}
           </div>
-          <div className="flex border-t border-slate-200">
-            <div className="w-[120px] shrink-0 bg-sky-50 px-1.5 py-1 text-xs font-semibold text-slate-700 border-r border-slate-200 flex items-center justify-center text-center">附注</div>
+        </div>
+
+        {/* 其他 */}
+        <div>
+          <div className="px-2 py-0.5 text-xs font-bold text-slate-700 bg-emerald-100 border-b border-slate-200 text-center">其他</div>
+          <div className="flex">
+            <div className="w-[120px] shrink-0 bg-sky-50 px-1.5 py-1 text-xs font-semibold text-slate-700 border-r border-slate-200 flex items-center justify-center text-center whitespace-nowrap">附注</div>
             <div className="flex-1 px-1.5 py-1 bg-white"><textarea defaultValue={data.notes || ''} rows={1} className="w-full border-0 bg-transparent outline-none text-xs resize-none text-slate-800" /></div>
           </div>
         </div>
@@ -490,10 +503,13 @@ function UnitForm({ data }: { data: Record<string, string> }) {
 // ─── Volume-level form ───
 
 function VolumeForm({ data }: { data: Record<string, string> }) {
-  const VCF = (label: string, key: string) => (
+  const VCF = (label: string, key: string, disabled?: boolean) => (
     <div className="flex">
       <div className="w-[100px] shrink-0 bg-sky-50 px-1.5 py-1 text-xs font-semibold text-slate-700 border-r border-slate-200 flex items-center justify-center text-center whitespace-nowrap">{label}</div>
-      <div className="flex-1 px-1.5 py-1 bg-white"><input type="text" defaultValue={data[key] || ''} className="w-full border-0 bg-transparent outline-none text-xs text-slate-800" /></div>
+      <div className={`flex-1 px-1.5 py-1 ${disabled ? 'bg-slate-100' : 'bg-white'}`}>
+        <input type="text" defaultValue={data[key] || ''} disabled={disabled}
+          className="w-full border-0 bg-transparent outline-none text-xs text-slate-800 disabled:text-slate-400 disabled:cursor-not-allowed" />
+      </div>
     </div>
   );
   return (
@@ -532,13 +548,13 @@ function VolumeForm({ data }: { data: Record<string, string> }) {
         <div>
           <div className="px-2 py-0.5 text-xs font-bold text-slate-700 bg-amber-50 border-b border-slate-200 text-center">档号</div>
           <div className="flex border-b border-slate-200">
-            <div className="w-[100px] shrink-0 bg-sky-50 px-1.5 py-1 text-xs font-semibold text-slate-700 border-r border-slate-200 flex items-center justify-center text-center">档号</div>
-            <div className="flex-1 px-1.5 py-1 bg-white"><input type="text" defaultValue={data.archiveCode || ''} className="w-full border-0 bg-transparent outline-none text-xs text-slate-800" /></div>
+            <div className="w-[100px] shrink-0 bg-sky-50 px-1.5 py-1 text-xs font-semibold text-slate-700 border-r border-slate-200 flex items-center justify-center text-center whitespace-nowrap">档号</div>
+            <div className="flex-1 px-1.5 py-1 bg-slate-100"><input type="text" defaultValue={data.archiveCode || ''} disabled className="w-full border-0 bg-transparent outline-none text-xs text-slate-400 cursor-not-allowed" /></div>
           </div>
           <div className="grid grid-cols-3 divide-x divide-slate-200">
-            {VCF('总登记号', 'totalRegNo')}
-            {VCF('大类流水号', 'classSerialNo')}
-            {VCF('案卷档号', 'volumeCode')}
+            {VCF('总登记号', 'totalRegNo', true)}
+            {VCF('大类流水号', 'classSerialNo', true)}
+            {VCF('案卷档号', 'volumeCode', true)}
           </div>
         </div>
 
@@ -596,10 +612,13 @@ function VolumeForm({ data }: { data: Record<string, string> }) {
 // ─── File-level form ───
 
 function FileForm({ data }: { data: Record<string, string> }) {
-  const FCF = (label: string, key: string) => (
+  const FCF = (label: string, key: string, disabled?: boolean) => (
     <div className="flex">
       <div className="w-[100px] shrink-0 bg-sky-50 px-1.5 py-1 text-xs font-semibold text-slate-700 border-r border-slate-200 flex items-center justify-center text-center whitespace-nowrap">{label}</div>
-      <div className="flex-1 px-1.5 py-1 bg-white"><input type="text" defaultValue={data[key] || ''} className="w-full border-0 bg-transparent outline-none text-xs text-slate-800" /></div>
+      <div className={`flex-1 px-1.5 py-1 ${disabled ? 'bg-slate-100' : 'bg-white'}`}>
+        <input type="text" defaultValue={data[key] || ''} disabled={disabled}
+          className="w-full border-0 bg-transparent outline-none text-xs text-slate-800 disabled:text-slate-400 disabled:cursor-not-allowed" />
+      </div>
     </div>
   );
   return (
@@ -613,7 +632,7 @@ function FileForm({ data }: { data: Record<string, string> }) {
             <div className="flex-1 px-1.5 py-1 bg-white"><textarea defaultValue={data.fileTitle || ''} rows={1} className="w-full border-0 bg-transparent outline-none text-xs resize-none text-slate-800" /></div>
           </div>
           <div className="grid grid-cols-2 divide-x divide-slate-200">
-            {FCF('档号', 'docNo')}
+            {FCF('档号', 'docNo', true)}
             {FCF('文(图)号', 'archiveNo')}
           </div>
           <div className="grid grid-cols-3 divide-x divide-slate-200 border-t border-slate-200">
@@ -674,10 +693,112 @@ function FileForm({ data }: { data: Record<string, string> }) {
   );
 }
 
+// ─── Add File Form ───
+
+interface AddFileFormProps {
+  parentVolumeId: string;
+  meta: Record<string, string>;
+  onMetaChange: (meta: Record<string, string>) => void;
+  onSave: (meta: Record<string, string>, dataUrl: string) => void;
+}
+
+function AddFileForm({ parentVolumeId, meta, onMetaChange, onSave }: AddFileFormProps) {
+  const [dataUrl, setDataUrl] = useState('');
+  const [fileName, setFileName] = useState('');
+
+  const setMeta = (key: string, value: string) => {
+    onMetaChange({ ...meta, [key]: value });
+  };
+
+  const handleFilePick = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.pdf';
+    input.onchange = (e: any) => {
+      const file = e.target?.files?.[0];
+      if (!file) return;
+      setFileName(file.name.replace(/\.pdf$/i, ''));
+      const reader = new FileReader();
+      reader.onload = () => setDataUrl(reader.result as string);
+      reader.readAsDataURL(file);
+    };
+    input.click();
+  };
+
+  const fields = [
+    { label: '文件题名', key: 'fileTitle', type: 'textarea' },
+    { label: '档号', key: 'docNo' },
+    { label: '文(图)号', key: 'archiveNo' },
+    { label: '责任者', key: 'responsible' },
+    { label: '缩微号', key: 'microNo' },
+    { label: '保管期限', key: 'retention' },
+    { label: '密级', key: 'secretLevel' },
+    { label: '形成时间', key: 'date' },
+    { label: '提要', key: 'summary' },
+    { label: '主题词', key: 'keywords' },
+    { label: '附注', key: 'notes' },
+  ];
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <button onClick={handleFilePick}
+          className="px-3 py-1.5 text-xs bg-sky-100 text-sky-700 rounded-lg hover:bg-sky-200 border border-sky-200">
+          {dataUrl ? `已选择: ${fileName}.pdf` : '选择PDF文件'}
+        </button>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        {fields.map(f => (
+          <div key={f.key} className="flex items-center gap-1">
+            <label className="text-[10px] text-slate-500 w-[60px] shrink-0 text-right">{f.label}</label>
+            {f.type === 'textarea' ? (
+              <textarea value={meta[f.key] || ''} onChange={e => setMeta(f.key, e.target.value)}
+                rows={1} className="flex-1 border border-slate-200 rounded px-1.5 py-1 text-xs outline-none resize-none" />
+            ) : (
+              <input type="text" value={meta[f.key] || ''} onChange={e => setMeta(f.key, e.target.value)}
+                className="flex-1 border border-slate-200 rounded px-1.5 py-1 text-xs outline-none" />
+            )}
+          </div>
+        ))}
+      </div>
+      <div className="flex justify-end gap-2 pt-1">
+        <button onClick={() => onSave(meta, dataUrl)}
+          disabled={!dataUrl}
+          className="px-4 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-40">
+          保存
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Component ───
 
-export const Step3Catalog: React.FC<Step3CatalogProps> = ({ treeData, selectedNode, onSelectNode, onComplete, onGoToArchive, onCancel }) => {
+export const Step3Catalog: React.FC<Step3CatalogProps> = ({ treeData, selectedNode, onSelectNode, onComplete, onGoToArchive, onCancel, onDeleteFile, onReplacePdf, onUpdateFileMeta, onAddFile, onMoveFile }) => {
   const [expandedIds, setExpandedIds] = useState<string[]>(() => collectExpandedIds(treeData));
+  const [activeFileTab, setActiveFileTab] = useState<'catalog' | 'preview' | 'add'>('catalog');
+  const [addFileMeta, setAddFileMeta] = useState<Record<string, string>>({});
+  const [treeWidth, setTreeWidth] = useState(224); // 224px = w-56
+  const [isDragging, setIsDragging] = useState(false);
+
+  // Resize handler
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+    const startX = e.clientX;
+    const startWidth = treeWidth;
+    const handleMouseMove = (ev: MouseEvent) => {
+      const newWidth = Math.max(120, Math.min(500, startWidth + ev.clientX - startX));
+      setTreeWidth(newWidth);
+    };
+    const handleMouseUp = () => {
+      setIsDragging(false);
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  }, [treeWidth]);
 
   const toggleExpand = useCallback((id: string) => {
     setExpandedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
@@ -717,10 +838,10 @@ export const Step3Catalog: React.FC<Step3CatalogProps> = ({ treeData, selectedNo
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex justify-between items-center px-6 py-3 border-b border-slate-200 bg-slate-50/50">
+      <div className="flex justify-between items-center px-6 py-2 border-b border-slate-200 bg-slate-50/50">
         <div>
           <h3 className="text-sm font-bold text-slate-800">档案著录</h3>
-          <p className="text-[11px] text-slate-500">请完善各层级元数据信息</p>
+          <p className="text-[10px] text-slate-500">请完善各层级元数据信息</p>
         </div>
         <div className="flex items-center gap-3">
           <button onClick={onCancel} className="px-4 py-2 text-slate-600 hover:bg-slate-200 rounded-lg text-xs">返回</button>
@@ -733,10 +854,15 @@ export const Step3Catalog: React.FC<Step3CatalogProps> = ({ treeData, selectedNo
         </div>
       </div>
       <div className="flex flex-1 min-h-0">
-        <div className="w-56 border-r border-slate-200 bg-white overflow-y-auto flex-shrink-0">
+        <div className="border-r border-slate-200 bg-white overflow-y-auto flex-shrink-0" style={{ width: treeWidth }}>
           <div className="p-2.5 text-[11px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50 border-b border-slate-100 sticky top-0">档案目录结构</div>
           <div className="py-1">{renderTree(treeData)}</div>
         </div>
+        {/* Drag handle */}
+        <div
+          onMouseDown={handleMouseDown}
+          className={`w-1.5 cursor-col-resize flex-shrink-0 transition-colors ${isDragging ? 'bg-blue-400' : 'bg-transparent hover:bg-slate-200'}`}
+        />
         <div className="flex-1 bg-slate-50/50 pl-3 py-3 overflow-y-auto">
           <div className="space-y-3">
             <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
@@ -759,7 +885,74 @@ export const Step3Catalog: React.FC<Step3CatalogProps> = ({ treeData, selectedNo
             ) : selectedNode.type === 'VOLUME' ? (
               <VolumeForm data={selectedNode.data} />
             ) : selectedNode.type === 'FILE' ? (
-              <FileForm data={selectedNode.data} />
+              <div className="space-y-2">
+                {/* Tab buttons + Operation buttons */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => setActiveFileTab('catalog')}
+                      className={`px-3 py-1 text-xs rounded-lg font-medium ${activeFileTab === 'catalog' ? 'bg-sky-100 text-sky-700' : 'text-slate-500 hover:bg-slate-100'}`}>著录</button>
+                    <span className="text-slate-200 mx-1">|</span>
+                    <button onClick={() => onMoveFile?.(selectedNode.id, 'up')}
+                      className="px-2 py-1 text-[10px] bg-white border border-slate-200 rounded text-slate-500 hover:bg-slate-50">上移</button>
+                    <button onClick={() => onMoveFile?.(selectedNode.id, 'down')}
+                      className="px-2 py-1 text-[10px] bg-white border border-slate-200 rounded text-slate-500 hover:bg-slate-50">下移</button>
+                    <button onClick={() => { setActiveFileTab('add'); setAddFileMeta({}); }}
+                      className="px-2 py-1 text-[10px] bg-white border border-slate-200 rounded text-slate-500 hover:bg-slate-50">添加文件</button>
+                    <button onClick={() => {
+                      const input = document.createElement('input');
+                      input.type = 'file';
+                      input.accept = '.pdf';
+                      input.onchange = (e: any) => {
+                        const file = e.target?.files?.[0];
+                        if (!file) return;
+                        const reader = new FileReader();
+                        reader.onload = () => onReplacePdf?.(selectedNode.id, reader.result as string);
+                        reader.readAsDataURL(file);
+                      };
+                      input.click();
+                    }}
+                      className="px-2 py-1 text-[10px] bg-white border border-slate-200 rounded text-slate-500 hover:bg-slate-50">更换文件</button>
+                    <button onClick={() => { if (confirm('确认删除此文件？')) onDeleteFile?.(selectedNode.id); }}
+                      className="px-2 py-1 text-[10px] bg-red-50 border border-red-200 rounded text-red-600 hover:bg-red-100">删除文件</button>
+                  </div>
+                  <button onClick={() => setActiveFileTab('preview')}
+                    className={`px-3 py-1 text-xs rounded-lg font-medium ${activeFileTab === 'preview' ? 'bg-sky-100 text-sky-700' : 'bg-white border border-slate-200 text-slate-500 hover:bg-slate-50'}`}>预览</button>
+                </div>
+
+                {/* 著录 tab */}
+                {activeFileTab === 'catalog' && (
+                  <FileForm data={selectedNode.data} />
+                )}
+
+                {/* 预览 tab */}
+                {activeFileTab === 'preview' && (
+                  <div className="border border-slate-200 rounded-lg overflow-hidden bg-white p-2">
+                    {selectedNode.data.url ? (
+                      <embed src={selectedNode.data.url} type="application/pdf" className="w-full" style={{ height: '60vh' }} />
+                    ) : (
+                      <div className="text-center py-12 text-slate-400 text-xs">暂无PDF文件</div>
+                    )}
+                  </div>
+                )}
+
+                {/* +新增文件 tab */}
+                {activeFileTab === 'add' && (
+                  <div className="border border-slate-200 rounded-lg overflow-hidden bg-white">
+                    <div className="px-2 py-0.5 text-xs font-bold text-white bg-slate-500 text-center">新增文件</div>
+                    <div className="p-3 space-y-2 max-h-[55vh] overflow-y-auto">
+                      <AddFileForm
+                        parentVolumeId={selectedNode.id}
+                        meta={addFileMeta}
+                        onMetaChange={setAddFileMeta}
+                        onSave={(meta, dataUrl) => {
+                          onAddFile?.(selectedNode.id, meta, dataUrl);
+                          setActiveFileTab('catalog');
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
             ) : (
               categories.map((cat, ci) => (
                 <div key={ci} className="border border-slate-200 rounded-lg overflow-hidden">

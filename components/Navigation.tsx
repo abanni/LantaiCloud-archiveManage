@@ -87,7 +87,7 @@ export const Sidebar: React.FC<NavigationProps> = ({
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-xs font-semibold text-white truncate">档案馆管理</p>
-            <p className="text-[10px] text-emerald-400/80 truncate">昆山市城建档案馆</p>
+            <p className="text-xs text-emerald-400/80 truncate">昆山市城建档案馆</p>
           </div>
         </button>
       </div>

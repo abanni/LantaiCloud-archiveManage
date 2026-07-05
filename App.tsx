@@ -34,6 +34,7 @@ const App: React.FC = () => {
     const view = HASH_VIEW[hash];
     return (view as ViewState) || ViewState.HOME;
   });
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   // Sync hash when view changes
   useEffect(() => {
@@ -121,13 +122,19 @@ const App: React.FC = () => {
 
   return (
     <div className="flex bg-slate-50 min-h-screen">
-      <Sidebar 
-        currentView={currentView} 
-        onChangeView={setCurrentView} 
-      />
-      <main className="ml-[232px] flex-1 flex flex-col h-screen overflow-hidden transition-all duration-300">
+      {!sidebarCollapsed && (
+        <Sidebar 
+          currentView={currentView} 
+          onChangeView={setCurrentView} 
+        />
+      )}
+      <main className={`flex-1 flex flex-col h-screen overflow-hidden transition-all duration-300 ${sidebarCollapsed ? 'ml-0' : 'ml-[232px]'}`}>
         {/* Top Bar */}
-        <div className="h-12 flex items-center justify-end px-6 bg-white border-b border-slate-200 flex-shrink-0">
+        <div className="h-12 flex items-center justify-between px-6 bg-white border-b border-slate-200 flex-shrink-0">
+          <button onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            className="text-slate-400 hover:text-slate-600 text-xs px-2 py-1 rounded hover:bg-slate-100 transition-colors">
+            {sidebarCollapsed ? '☰ 展开' : '✕ 收起'}
+          </button>
           <UserSwitcher
             currentUser={currentUser}
             onSwitchUser={setCurrentUser}
