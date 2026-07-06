@@ -209,12 +209,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentUser, onChangeView 
                 <h4 className="text-[11px] font-bold text-slate-700 mb-2">载体类型统计</h4>
                 <div className="h-[180px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={carrierDetail} layout="vertical" margin={{ left: 70 }}>
-                      <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
-                      <XAxis type="number" tick={{fontSize:10}} axisLine={false} tickLine={false} />
-                      <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{fontSize:11,fill:'#475569'}} width={70} />
+                    <BarChart data={carrierDetail} >
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize:10,fill:'#475569'}} angle={-30} textAnchor="end" height={50} />
+                      <YAxis tick={{fontSize:10}} axisLine={false} tickLine={false} />
                       <Tooltip cursor={{fill:'#f8fafc'}} />
-                      <Bar dataKey="卷数" radius={[0,4,4,0]} barSize={12}>
+                      <Bar dataKey="卷数" radius={[4,4,0,0]} barSize={18}>
                         {carrierDetail.map((e, i) => <Cell key={i} fill={e.color} />)}
                       </Bar>
                     </BarChart>
@@ -226,9 +226,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentUser, onChangeView 
                 <h4 className="text-[11px] font-bold text-slate-700 mb-2">热门馆藏分类</h4>
                 <div className="h-[180px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={hotArchive}>
+                    <BarChart data={hotArchive} >
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                       <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize:11,fill:'#64748b'}} />
+                      <YAxis tick={{fontSize:10}} axisLine={false} tickLine={false} />
                       <Tooltip cursor={{fill:'#f8fafc'}} />
                       <Bar dataKey="value" name="卷数" radius={[4,4,0,0]} barSize={40}>
                         {hotArchive.map((e, i) => <Cell key={i} fill={e.color} />)}
@@ -255,7 +256,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentUser, onChangeView 
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-6">
                 <h4 className="text-[11px] font-bold text-slate-700 mb-2">服务利用人结构占比</h4>
                 <div className="space-y-2.5">
