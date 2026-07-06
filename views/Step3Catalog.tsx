@@ -979,7 +979,7 @@ export const Step3Catalog: React.FC<Step3CatalogProps> = ({ treeData, selectedNo
             <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
               <span className={`text-xs font-bold px-2 py-0.5 rounded ${
                 selectedNode.type === 'PROJECT' ? 'bg-blue-100 text-blue-700' :
-                selectedNode.type === 'UNIT' ? 'bg-indigo-100 text-indigo-700' :
+                selectedNode.type === 'UNIT' ? 'bg-emerald-100 text-emerald-700' :
                 selectedNode.type === 'VOLUME' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-700'
               }`}>
                 {selectedNode.type === 'PROJECT' ? '项目级' :

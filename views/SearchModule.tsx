@@ -5,7 +5,7 @@ import { SelectionItem } from '../types';
 
 const LEVEL_CONFIG = [
   { key: 'PROJECT', label: '项目级', icon: FolderOpen, color: 'bg-blue-100 text-blue-700', border: 'border-blue-200', hover: 'hover:bg-blue-50' },
-  { key: 'UNIT', label: '工程级', icon: Layers, color: 'bg-indigo-100 text-indigo-700', border: 'border-indigo-200', hover: 'hover:bg-indigo-50' },
+  { key: 'UNIT', label: '工程级', icon: Layers, color: 'bg-emerald-100 text-emerald-700', border: 'border-emerald-200', hover: 'hover:bg-indigo-50' },
   { key: 'VOLUME', label: '案卷级', icon: Box, color: 'bg-amber-100 text-amber-700', border: 'border-amber-200', hover: 'hover:bg-amber-50' },
   { key: 'FILE', label: '文件级', icon: File, color: 'bg-slate-100 text-slate-700', border: 'border-slate-200', hover: 'hover:bg-slate-50' },
 ];

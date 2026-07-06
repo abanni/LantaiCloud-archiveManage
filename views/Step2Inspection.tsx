@@ -121,7 +121,7 @@ export const Step2Inspection: React.FC<Step2InspectionProps> = ({ task, onBack, 
   const getTypeBadge = (type: string) => {
     const styles: Record<string, string> = {
       '项目级': 'bg-blue-100 text-blue-700',
-      '工程级': 'bg-indigo-100 text-indigo-700',
+      '工程级': 'bg-emerald-100 text-emerald-700',
       '案卷级': 'bg-amber-100 text-amber-700',
       '文件级': 'bg-slate-100 text-slate-600',
     };

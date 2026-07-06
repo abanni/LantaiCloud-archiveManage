@@ -249,7 +249,7 @@ export const Step4Confirm: React.FC<Step4ConfirmProps> = ({ taskName, onReturn, 
 
   const levelColor = (lvl: string) => {
     if (lvl === '项目级') return 'bg-blue-100 text-blue-700';
-    if (lvl === '工程级') return 'bg-indigo-100 text-indigo-700';
+    if (lvl === '工程级') return 'bg-emerald-100 text-emerald-700';
     if (lvl === '案卷级') return 'bg-amber-100 text-amber-700';
     return 'bg-slate-100 text-slate-600';
   };
@@ -334,7 +334,7 @@ export const Step4Confirm: React.FC<Step4ConfirmProps> = ({ taskName, onReturn, 
             </div>
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2 text-xs">
-                <span className="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-medium">{levelCounts.units} 个工程</span>
+                <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-medium">{levelCounts.units} 个工程</span>
                 <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">{levelCounts.volumes} 个案卷</span>
                 <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-medium">{levelCounts.files} 个文件</span>
               </div>

@@ -292,7 +292,15 @@ export const UtilizationModule: React.FC<UtilizationModuleProps> = ({ basket = [
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredLogs.map(log => (
+              {filteredLogs.length === 0 ? (
+                <tr><td colSpan={6} className="py-16 text-center">
+                  <div className="text-slate-400">
+                    <Search size={36} className="mx-auto mb-3 opacity-20" />
+                    <p className="text-xs">未找到匹配的利用记录</p>
+                    {logSearch && <p className="text-[10px] mt-1 text-slate-500">请尝试其他关键词</p>}
+                  </div>
+                </td></tr>
+              ) : filteredLogs.map(log => (
                 <tr key={log.id} className="hover:bg-slate-50 transition-colors">
                   <td className="px-6 py-4 font-mono text-xs text-slate-500">{log.id}</td>
                   <td className="px-6 py-4 text-slate-500 whitespace-nowrap">

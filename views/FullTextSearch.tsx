@@ -24,7 +24,7 @@ function buildSearchIndex() {
 
 const LEVELS = [
   { key: 'PROJECT', label: '项目级', icon: FolderOpen, color: 'bg-blue-100 text-blue-700' },
-  { key: 'UNIT', label: '工程级', icon: Layers, color: 'bg-indigo-100 text-indigo-700' },
+  { key: 'UNIT', label: '工程级', icon: Layers, color: 'bg-emerald-100 text-emerald-700' },
   { key: 'VOLUME', label: '案卷级', icon: Box, color: 'bg-amber-100 text-amber-700' },
   { key: 'FILE', label: '文件级', icon: File, color: 'bg-slate-100 text-slate-700' },
 ];
@@ -53,6 +53,7 @@ export const FullTextSearch: React.FC<FullTextSearchProps> = ({ basket, setBaske
   const [previewTab, setPreviewTab] = useState<'meta' | 'preview'>('meta');
   const [results, setResults] = useState<any[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
+  const [toast, setToast] = useState('');
 
   const flatItems = useMemo(() => buildSearchIndex(), []);
 
@@ -61,10 +62,18 @@ export const FullTextSearch: React.FC<FullTextSearchProps> = ({ basket, setBaske
   const toggleBasket = (item: any) => {
     if (isInBasket(item.id, item.type)) {
       setBasket(prev => prev.filter(i => !(i.id === item.id && i.type === item.type)));
+      setToast(`已移除「${item.label}」`);
     } else {
       setBasket(prev => [...prev, { id: item.id, type: item.type, title: item.label, code: '' }]);
+      setToast(`已加入「${item.label}」`);
     }
   };
+
+  React.useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(''), 2000);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   const doSearch = useCallback((kw: string) => {
     if (!kw.trim()) { setResults([]); setHasSearched(false); return; }
