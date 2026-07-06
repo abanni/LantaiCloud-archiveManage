@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>入库流程 — 四阶段</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#020617;font-family:'JetBrains Mono',monospace;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:40px}
+.diagram-container{max-width:1100px;width:100%}
+/* Header */
+.header{text-align:center;margin-bottom:40px}
+.header h1{color:#f1f5f9;font-size:22px;font-weight:700;letter-spacing:-0.5px}
+.header .subtitle{color:#64748b;font-size:11px;margin-top:6px}
+.header .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#22d3ee;margin-right:8px;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+/* Main SVG Card */
+.diagram-card{background:#0f172a;border:1px solid #1e293b;border-radius:16px;padding:30px;box-shadow:0 25px 50px -12px rgba(0,0,0,0.5)}
+svg{width:100%;height:auto;display:block}
+/* Summary Cards */
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:24px}
+.card{background:#0f172a;border:1px solid #1e293b;border-radius:10px;padding:16px}
+.card-header{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.card-dot{width:8px;height:8px;border-radius:50%}
+.card-dot.blue{background:#22d3ee}
+.card-dot.green{background:#34d399}
+.card-dot.violet{background:#a78bfa}
+.card-dot.amber{background:#fbbf24}
+.card h3{color:#e2e8f0;font-size:11px;font-weight:600}
+.card ul{list-style:none;padding:0}
+.card li{color:#94a3b8;font-size:9px;line-height:1.8;padding-left:8px;position:relative}
+.card li::before{content:'▸';position:absolute;left:0;color:#475569}
+/* Footer */
+.footer{text-align:center;margin-top:20px;color:#334155;font-size:9px}
+</style>
+</head>
+<body>
+<div class="diagram-container">
+  <div class="header">
+    <h1><span class="dot"></span>入库流程 — 四阶段</h1>
+    <p class="subtitle">用户上传 → 系统检测 → 著录元数据 → 确认入库</p>
+  </div>
+
+  <div class="diagram-card">
+    <svg viewBox="0 0 1000 480" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <!-- Grid -->
+        <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+          <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/>
+        </pattern>
+        <!-- Arrow markers -->
+        <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 Z" fill="#475569"/>
+        </marker>
+        <marker id="arrow-active" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 Z" fill="#22d3ee"/>
+        </marker>
+        <!-- Glow filter -->
+        <filter id="glow">
+          <feGaussianBlur stdDeviation="3" result="blur"/>
+          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+        <!-- Stage labels -->
+        <linearGradient id="stage1" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#22d3ee" stop-opacity="0.15"/>
+          <stop offset="100%" stop-color="#22d3ee" stop-opacity="0.05"/>
+        </linearGradient>
+        <linearGradient id="stage2" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#34d399" stop-opacity="0.15"/>
+          <stop offset="100%" stop-color="#34d399" stop-opacity="0.05"/>
+        </linearGradient>
+        <linearGradient id="stage3" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#a78bfa" stop-opacity="0.15"/>
+          <stop offset="100%" stop-color="#a78bfa" stop-opacity="0.05"/>
+        </linearGradient>
+        <linearGradient id="stage4" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#fbbf24" stop-opacity="0.15"/>
+          <stop offset="100%" stop-color="#fbbf24" stop-opacity="0.05"/>
+        </linearGradient>
+      </defs>
+
+      <!-- Background -->
+      <rect width="1000" height="480" fill="url(#grid)"/>
+
+      <!-- Stage boundary boxes -->
+      <!-- Stage 1: 上传 -->
+      <rect x="30" y="40" width="200" height="400" rx="12" fill="none" stroke="#22d3ee" stroke-width="1.5" stroke-dasharray="8,4" opacity="0.4"/>
+      <text x="40" y="62" fill="#22d3ee" font-size="10" font-weight="600" opacity="0.7">阶段一</text>
+
+      <!-- Stage 2: 检测 -->
+      <rect x="270" y="40" width="200" height="400" rx="12" fill="none" stroke="#34d399" stroke-width="1.5" stroke-dasharray="8,4" opacity="0.4"/>
+      <text x="280" y="62" fill="#34d399" font-size="10" font-weight="600" opacity="0.7">阶段二</text>
+
+      <!-- Stage 3: 著录 -->
+      <rect x="510" y="40" width="200" height="400" rx="12" fill="none" stroke="#a78bfa" stroke-width="1.5" stroke-dasharray="8,4" opacity="0.4"/>
+      <text x="520" y="62" fill="#a78bfa" font-size="10" font-weight="600" opacity="0.7">阶段三</text>
+
+      <!-- Stage 4: 入库 -->
+      <rect x="750" y="40" width="220" height="400" rx="12" fill="none" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="8,4" opacity="0.4"/>
+      <text x="760" y="62" fill="#fbbf24" font-size="10" font-weight="600" opacity="0.7">阶段四</text>
+
+      <!-- Arrows between stages -->
+      <line x1="230" y1="240" x2="260" y2="240" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+      <line x1="470" y1="240" x2="500" y2="240" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+      <line x1="710" y1="240" x2="740" y2="240" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+
+      <!-- === Stage 1: 用户上传文件 === -->
+      <!-- Upload icon box -->
+      <rect x="55" y="120" width="150" height="60" rx="8" fill="#0f172a" stroke="#22d3ee" stroke-width="1.5"/>
+      <rect x="55" y="120" width="150" height="60" rx="8" fill="rgba(8,51,68,0.4)"/>
+      <text x="130" y="147" text-anchor="middle" fill="#22d3ee" font-size="12" font-weight="600">📤 上传档案包</text>
+      <text x="130" y="165" text-anchor="middle" fill="#64748b" font-size="9">选择本地档案或接收推送</text>
+
+      <!-- Sub-items -->
+      <rect x="65" y="200" width="130" height="32" rx="5" fill="url(#stage1)" stroke="#22d3ee" stroke-width="0.5" stroke-opacity="0.3"/>
+      <text x="130" y="220" text-anchor="middle" fill="#94a3b8" font-size="9">自动创建项目记录</text>
+
+      <rect x="65" y="242" width="130" height="32" rx="5" fill="url(#stage1)" stroke="#22d3ee" stroke-width="0.5" stroke-opacity="0.3"/>
+      <text x="130" y="262" text-anchor="middle" fill="#94a3b8" font-size="9">解析档案结构</text>
+
+      <!-- Status badge -->
+      <rect x="75" y="310" width="110" height="24" rx="12" fill="rgba(8,51,68,0.6)" stroke="#22d3ee" stroke-width="0.5" stroke-opacity="0.5"/>
+      <text x="130" y="326" text-anchor="middle" fill="#22d3ee" font-size="9">就绪</text>
+
+      <!-- === Stage 2: 系统自动检测 === -->
+      <rect x="295" y="120" width="150" height="60" rx="8" fill="#0f172a" stroke="#34d399" stroke-width="1.5"/>
+      <rect x="295" y="120" width="150" height="60" rx="8" fill="rgba(6,78,59,0.4)"/>
+      <text x="370" y="147" text-anchor="middle" fill="#34d399" font-size="12" font-weight="600">🔍 系统检测</text>
+      <text x="370" y="165" text-anchor="middle" fill="#64748b" font-size="9">检测档案包完整性</text>
+
+      <rect x="305" y="200" width="130" height="32" rx="5" fill="url(#stage2)" stroke="#34d399" stroke-width="0.5" stroke-opacity="0.3"/>
+      <text x="370" y="220" text-anchor="middle" fill="#94a3b8" font-size="9">真实性校验</text>
+
+      <rect x="305" y="242" width="130" height="32" rx="5" fill="url(#stage2)" stroke="#34d399" stroke-width="0.5" stroke-opacity="0.3"/>
+      <text x="370" y="262" text-anchor="middle" fill="#94a3b8" font-size="9">完整性核查</text>
+
+      <rect x="305" y="284" width="130" height="32" rx="5" fill="url(#stage2)" stroke="#34d399" stroke-width="0.5" stroke-opacity="0.3"/>
+      <text x="370" y="304" text-anchor="middle" fill="#94a3b8" font-size="9">安全性扫描</text>
+
+      <!-- Status badge -->
+      <rect x="315" y="340" width="110" height="24" rx="12" fill="rgba(6,78,59,0.6)" stroke="#34d399" stroke-width="0.5" stroke-opacity="0.5"/>
+      <text x="370" y="356" text-anchor="middle" fill="#34d399" font-size="9">通过 ✓</text>
+
+      <!-- === Stage 3: 著录元数据 === -->
+      <rect x="535" y="100" width="150" height="60" rx="8" fill="#0f172a" stroke="#a78bfa" stroke-width="1.5"/>
+      <rect x="535" y="100" width="150" height="60" rx="8" fill="rgba(76,29,149,0.4)"/>
+      <text x="610" y="125" text-anchor="middle" fill="#a78bfa" font-size="12" font-weight="600">📋 著录元数据</text>
+      <text x="610" y="143" text-anchor="middle" fill="#64748b" font-size="9">四层元数据编辑</text>
+
+      <!-- 4 levels -->
+      <rect x="545" y="180" width="130" height="24" rx="4" fill="url(#stage3)" stroke="#a78bfa" stroke-width="0.5" stroke-opacity="0.3"/>
+      <text x="610" y="196" text-anchor="middle" fill="#94a3b8" font-size="9">项目级</text>
+
+      <rect x="545" y="212" width="130" height="24" rx="4" fill="url(#stage3)" stroke="#a78bfa" stroke-width="0.5" stroke-opacity="0.3"/>
+      <text x="610" y="228" text-anchor="middle" fill="#94a3b8" font-size="9">工程级</text>
+
+      <rect x="545" y="244" width="130" height="24" rx="4" fill="url(#stage3)" stroke="#a78bfa" stroke-width="0.5" stroke-opacity="0.3"/>
+      <text x="610" y="260" text-anchor="middle" fill="#94a3b8" font-size="9">案卷级</text>
+
+      <rect x="545" y="276" width="130" height="24" rx="4" fill="url(#stage3)" stroke="#a78bfa" stroke-width="0.5" stroke-opacity="0.3"/>
+      <text x="610" y="292" text-anchor="middle" fill="#94a3b8" font-size="9">文件级</text>
+
+      <!-- extra features -->
+      <rect x="545" y="315" width="130" height="28" rx="5" fill="url(#stage3)" stroke="#a78bfa" stroke-width="0.5" stroke-opacity="0.3"/>
+      <text x="610" y="333" text-anchor="middle" fill="#64748b" font-size="8">PDF 预览 · 右键操作</text>
+
+      <!-- === Stage 4: 确认入库 === -->
+      <rect x="775" y="100" width="170" height="60" rx="8" fill="#0f172a" stroke="#fbbf24" stroke-width="1.5"/>
+      <rect x="775" y="100" width="170" height="60" rx="8" fill="rgba(120,53,15,0.3)"/>
+      <text x="860" y="125" text-anchor="middle" fill="#fbbf24" font-size="12" font-weight="600">✅ 确认入库</text>
+      <text x="860" y="143" text-anchor="middle" fill="#64748b" font-size="9">生成档号 · 完成归档</text>
+
+      <rect x="785" y="180" width="150" height="32" rx="5" fill="url(#stage4)" stroke="#fbbf24" stroke-width="0.5" stroke-opacity="0.3"/>
+      <text x="860" y="200" text-anchor="middle" fill="#94a3b8" font-size="9">选择一/二/三类</text>
+
+      <rect x="785" y="222" width="150" height="32" rx="5" fill="url(#stage4)" stroke="#fbbf24" stroke-width="0.5" stroke-opacity="0.3"/>
+      <text x="860" y="242" text-anchor="middle" fill="#94a3b8" font-size="9">预览档号</text>
+
+      <rect x="785" y="264" width="150" height="32" rx="5" fill="url(#stage4)" stroke="#fbbf24" stroke-width="0.5" stroke-opacity="0.3"/>
+      <text x="860" y="284" text-anchor="middle" fill="#94a3b8" font-size="9">确认完成入库</text>
+
+      <!-- Legend -->
+      <rect x="30" y="420" width="8" height="8" rx="2" fill="#22d3ee" opacity="0.6"/>
+      <text x="44" y="428" fill="#64748b" font-size="8">上传</text>
+      <rect x="100" y="420" width="8" height="8" rx="2" fill="#34d399" opacity="0.6"/>
+      <text x="114" y="428" fill="#64748b" font-size="8">检测</text>
+      <rect x="170" y="420" width="8" height="8" rx="2" fill="#a78bfa" opacity="0.6"/>
+      <text x="184" y="428" fill="#64748b" font-size="8">著录</text>
+      <rect x="240" y="420" width="8" height="8" rx="2" fill="#fbbf24" opacity="0.6"/>
+      <text x="254" y="428" fill="#64748b" font-size="8">入库</text>
+    </svg>
+  </div>
+
+  <!-- Summary Cards -->
+  <div class="cards">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-dot blue"></div>
+        <h3>阶段一 · 档案包获取</h3>
+      </div>
+      <ul>
+        <li>支持系统打通推送</li>
+        <li>支持手动导入</li>
+        <li>自动解析项目结构</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <div class="card-dot green"></div>
+        <h3>阶段二 · 系统检测</h3>
+      </div>
+      <ul>
+        <li>真实性校验</li>
+        <li>完整性核查</li>
+        <li>安全性扫描</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <div class="card-dot violet"></div>
+        <h3>阶段三 · 著录</h3>
+      </div>
+      <ul>
+        <li>四层元数据编辑</li>
+        <li>文件级 PDF 预览</li>
+        <li>右键管理操作</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <div class="card-dot amber"></div>
+        <h3>阶段四 · 确认入库</h3>
+      </div>
+      <ul>
+        <li>选择档案分类</li>
+        <li>更新档号预览</li>
+        <li>确认完成归档</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span>兰台云-数智馆藏 · 入库流程现已分 4 个独立阶段</span>
+  </div>
+</div>
+</body>
+</html>

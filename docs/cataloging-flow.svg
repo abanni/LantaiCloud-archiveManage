@@ -1,0 +1,132 @@
+<svg viewBox="0 0 900 520" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" style="background:transparent;font-family:'PingFang SC','Microsoft YaHei',sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 Z" fill="#94a3b8"/>
+    </marker>
+    <marker id="arrow-violet" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 Z" fill="#a78bfa"/>
+    </marker>
+    <linearGradient id="sg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#a78bfa" stop-opacity="0.12"/><stop offset="100%" stop-color="#a78bfa" stop-opacity="0.03"/></linearGradient>
+  </defs>
+
+  <!-- Title -->
+  <text x="450" y="30" text-anchor="middle" fill="#e2e8f0" font-size="18" font-weight="bold">著录操作流程图</text>
+  <text x="450" y="48" text-anchor="middle" fill="#64748b" font-size="11">入库第3步 · 四层元数据编辑 + 文件管理</text>
+
+  <!-- ===== Column 1: 左侧树 ===== -->
+  <rect x="30" y="75" width="180" height="420" rx="10" fill="none" stroke="#a78bfa" stroke-width="1.2" stroke-dasharray="6,3" opacity="0.5"/>
+  <rect x="30" y="75" width="180" height="28" rx="10" fill="#a78bfa" opacity="0.08"/>
+  <text x="120" y="94" text-anchor="middle" fill="#a78bfa" font-size="11" font-weight="bold">📂 档案目录树</text>
+
+  <rect x="45" y="115" width="150" height="30" rx="5" fill="url(#sg)" stroke="#a78bfa" stroke-width="0.5" stroke-opacity="0.3"/>
+  <text x="120" y="133" text-anchor="middle" fill="#94a3b8" font-size="9">🟦 项目级</text>
+  <text x="120" y="147" text-anchor="middle" fill="#64748b" font-size="7">昆山市白莲湖低空飞行…</text>
+
+  <rect x="60" y="155" width="135" height="30" rx="5" fill="url(#sg)" stroke="#a78bfa" stroke-width="0.5" stroke-opacity="0.3"/>
+  <text x="127" y="173" text-anchor="middle" fill="#94a3b8" font-size="9">🟩 工程级 ×6</text>
+
+  <rect x="75" y="195" width="120" height="30" rx="5" fill="url(#sg)" stroke="#a78bfa" stroke-width="0.5" stroke-opacity="0.3"/>
+  <text x="135" y="213" text-anchor="middle" fill="#94a3b8" font-size="9">🟧 案卷级 ×44</text>
+
+  <rect x="90" y="235" width="105" height="30" rx="5" fill="url(#sg)" stroke="#a78bfa" stroke-width="0.5" stroke-opacity="0.3"/>
+  <text x="142" y="253" text-anchor="middle" fill="#94a3b8" font-size="9">⬜ 文件级 ×1253</text>
+
+  <!-- Context menu -->
+  <rect x="55" y="300" width="140" height="160" rx="6" fill="#0f172a" stroke="#1e293b" stroke-width="1"/>
+  <text x="125" y="318" text-anchor="middle" fill="#64748b" font-size="9" font-weight="bold">右键菜单</text>
+  <line x1="70" y1="326" x2="180" y2="326" stroke="#1e293b" stroke-width="0.5"/>
+  <text x="125" y="342" text-anchor="middle" fill="#94a3b8" font-size="9">上移</text>
+  <text x="125" y="360" text-anchor="middle" fill="#94a3b8" font-size="9">下移</text>
+  <text x="125" y="378" text-anchor="middle" fill="#94a3b8" font-size="9">展开子节点</text>
+  <text x="125" y="396" text-anchor="middle" fill="#94a3b8" font-size="9">收起子节点</text>
+  <line x1="70" y1="403" x2="180" y2="403" stroke="#1e293b" stroke-width="0.5"/>
+  <text x="125" y="418" text-anchor="middle" fill="#fbbf24" font-size="9">添加文件</text>
+  <text x="125" y="436" text-anchor="middle" fill="#fbbf24" font-size="9">更换文件</text>
+  <text x="125" y="454" text-anchor="middle" fill="#fb7185" font-size="9">删除文件</text>
+
+  <!-- Arrow column 1→2 -->
+  <line x1="210" y1="280" x2="238" y2="280" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- ===== Column 2: 右侧著录区 ===== -->
+  <rect x="250" y="75" width="280" height="420" rx="10" fill="none" stroke="#a78bfa" stroke-width="1.2" stroke-dasharray="6,3" opacity="0.5"/>
+  <rect x="250" y="75" width="280" height="28" rx="10" fill="#a78bfa" opacity="0.08"/>
+  <text x="390" y="94" text-anchor="middle" fill="#a78bfa" font-size="11" font-weight="bold">📝 著录表单区域</text>
+
+  <!-- Level badge bar -->
+  <rect x="265" y="115" width="250" height="34" rx="6" fill="#0f172a" stroke="#1e293b" stroke-width="0.8"/>
+  <text x="390" y="135" text-anchor="middle" fill="#60a5fa" font-size="10" font-weight="bold">🟦 项目级 · 项目名称</text>
+
+  <!-- Tabs -->
+  <rect x="265" y="157" width="60" height="24" rx="4" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="0.5"/>
+  <text x="295" y="173" text-anchor="middle" fill="#22d3ee" font-size="9">著录</text>
+  <rect x="330" y="157" width="60" height="24" rx="4" fill="#0f172a" stroke="#1e293b" stroke-width="0.5"/>
+  <text x="360" y="173" text-anchor="middle" fill="#64748b" font-size="9">预览</text>
+
+  <!-- Form preview -->
+  <rect x="265" y="190" width="250" height="220" rx="6" fill="url(#sg)" stroke="#a78bfa" stroke-width="0.5" stroke-opacity="0.2"/>
+  <text x="390" y="215" text-anchor="middle" fill="#64748b" font-size="9">项目级元数据表单</text>
+  <text x="390" y="233" text-anchor="middle" fill="#475569" font-size="8">基本信息 · 专业记载 · 档案状况</text>
+  <text x="390" y="251" text-anchor="middle" fill="#475569" font-size="8">保管信息 · 排检与编号</text>
+
+  <!-- Form rows mockup -->
+  <rect x="280" y="270" width="220" height="18" rx="3" fill="#0f172a" stroke="#1e293b" stroke-width="0.3"/>
+  <text x="390" y="283" text-anchor="middle" fill="#475569" font-size="7">项目名称 | 昆山市白莲湖低空飞行试验场项目</text>
+  <rect x="280" y="293" width="220" height="18" rx="3" fill="#0f172a" stroke="#1e293b" stroke-width="0.3"/>
+  <text x="390" y="306" text-anchor="middle" fill="#475569" font-size="7">建设单位 | 昆山经济技术开发区建筑安装…</text>
+  <rect x="280" y="316" width="220" height="18" rx="3" fill="#0f172a" stroke="#1e293b" stroke-width="0.3"/>
+  <text x="390" y="329" text-anchor="middle" fill="#475569" font-size="7">立项批准文号 | …</text>
+  <rect x="280" y="339" width="220" height="18" rx="3" fill="#0f172a" stroke="#1e293b" stroke-width="0.3"/>
+  <text x="390" y="352" text-anchor="middle" fill="#475569" font-size="7">专业记载 | 建筑面积 2301.94 m²</text>
+
+  <!-- Screenshot badge -->
+  <rect x="320" y="420" width="140" height="22" rx="11" fill="rgba(76,29,149,0.3)" stroke="#a78bfa" stroke-width="0.5" stroke-opacity="0.4"/>
+  <text x="390" y="434" text-anchor="middle" fill="#a78bfa" font-size="8">🖼️ 当前展示为截图</text>
+
+  <!-- Arrow column 2→3 -->
+  <line x1="530" y1="280" x2="558" y2="280" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- ===== Column 3: 操作功能区 ===== -->
+  <rect x="570" y="75" width="300" height="420" rx="10" fill="none" stroke="#a78bfa" stroke-width="1.2" stroke-dasharray="6,3" opacity="0.5"/>
+  <rect x="570" y="75" width="300" height="28" rx="10" fill="#a78bfa" opacity="0.08"/>
+  <text x="720" y="94" text-anchor="middle" fill="#a78bfa" font-size="11" font-weight="bold">⚙️ 操作区域</text>
+
+  <!-- PDF Preview -->
+  <rect x="585" y="115" width="270" height="100" rx="6" fill="url(#sg)" stroke="#a78bfa" stroke-width="0.5" stroke-opacity="0.2"/>
+  <text x="720" y="140" text-anchor="middle" fill="#64748b" font-size="9">📄 PDF 文件预览</text>
+  <rect x="620" y="155" width="200" height="40" rx="4" fill="#0f172a" stroke="#1e293b" stroke-width="0.5"/>
+  <text x="720" y="175" text-anchor="middle" fill="#475569" font-size="8">DemoFile1.pdf</text>
+  <text x="720" y="188" text-anchor="middle" fill="#334155" font-size="7">(embedded via &lt;embed&gt;)</text>
+
+  <!-- File operations -->
+  <rect x="585" y="230" width="270" height="80" rx="6" fill="url(#sg)" stroke="#a78bfa" stroke-width="0.5" stroke-opacity="0.15"/>
+  <text x="720" y="252" text-anchor="middle" fill="#64748b" font-size="9">📁 文件操作</text>
+  <rect x="605" y="265" width="80" height="24" rx="4" fill="rgba(6,78,59,0.3)" stroke="#34d399" stroke-width="0.5"/>
+  <text x="645" y="281" text-anchor="middle" fill="#34d399" font-size="8">添加文件</text>
+  <rect x="695" y="265" width="80" height="24" rx="4" fill="rgba(76,29,149,0.3)" stroke="#a78bfa" stroke-width="0.5"/>
+  <text x="735" y="281" text-anchor="middle" fill="#a78bfa" font-size="8">更换文件</text>
+  <rect x="785" y="265" width="60" height="24" rx="4" fill="rgba(136,19,55,0.3)" stroke="#fb7185" stroke-width="0.5"/>
+  <text x="815" y="281" text-anchor="middle" fill="#fb7185" font-size="8">删除</text>
+
+  <!-- Sort operations -->
+  <rect x="585" y="325" width="270" height="60" rx="6" fill="url(#sg)" stroke="#a78bfa" stroke-width="0.5" stroke-opacity="0.15"/>
+  <text x="720" y="347" text-anchor="middle" fill="#64748b" font-size="9">🔀 排序操作</text>
+  <rect x="605" y="355" width="80" height="22" rx="4" fill="#0f172a" stroke="#1e293b" stroke-width="0.5"/>
+  <text x="645" y="370" text-anchor="middle" fill="#94a3b8" font-size="8">上移</text>
+  <rect x="695" y="355" width="80" height="22" rx="4" fill="#0f172a" stroke="#1e293b" stroke-width="0.5"/>
+  <text x="735" y="370" text-anchor="middle" fill="#94a3b8" font-size="8">下移</text>
+  <rect x="785" y="355" width="60" height="22" rx="4" fill="#0f172a" stroke="#1e293b" stroke-width="0.5"/>
+  <text x="815" y="370" text-anchor="middle" fill="#475569" font-size="8">展开/收起</text>
+
+  <!-- Data persistence note -->
+  <rect x="585" y="405" width="270" height="40" rx="6" fill="rgba(76,29,149,0.15)" stroke="#a78bfa" stroke-width="0.5" stroke-opacity="0.3"/>
+  <text x="720" y="423" text-anchor="middle" fill="#64748b" font-size="9">💾 localStorage 持久化</text>
+  <text x="720" y="437" text-anchor="middle" fill="#475569" font-size="8">新增/删除/排序不写原 JSON</text>
+
+  <!-- Legend -->
+  <rect x="30" y="505" width="10" height="10" rx="2" fill="#a78bfa" opacity="0.6"/>
+  <text x="46" y="514" fill="#64748b" font-size="9">档案目录树</text>
+  <rect x="160" y="505" width="10" height="10" rx="2" fill="#a78bfa" opacity="0.6"/>
+  <text x="176" y="514" fill="#64748b" font-size="9">著录表单</text>
+  <rect x="270" y="505" width="10" height="10" rx="2" fill="#a78bfa" opacity="0.6"/>
+  <text x="286" y="514" fill="#64748b" font-size="9">操作区域</text>
+</svg>
