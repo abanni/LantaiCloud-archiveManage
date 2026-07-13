@@ -781,6 +781,7 @@ export const Step3Catalog: React.FC<Step3CatalogProps> = ({ treeData, selectedNo
   const [treeWidth, setTreeWidth] = useState(224);
   const [isDragging, setIsDragging] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; node: MetadataNode | null } | null>(null);
+  const [isDirty, setIsDirty] = useState(false);
 
   // Close context menu
   React.useEffect(() => {
@@ -839,6 +840,8 @@ export const Step3Catalog: React.FC<Step3CatalogProps> = ({ treeData, selectedNo
     const idx = all.findIndex(n => n.id === node.id);
     return idx === -1 || idx >= all.length - 1;
   };
+
+  const handleSave = () => { setIsDirty(false); };
 
   const handleContextMenu = (e: React.MouseEvent, node: MetadataNode) => {
     e.preventDefault();
@@ -955,14 +958,20 @@ export const Step3Catalog: React.FC<Step3CatalogProps> = ({ treeData, selectedNo
           <p className="text-[10px] text-slate-500">请完善各层级元数据信息</p>
         </div>
         <div className="flex items-center gap-3">
-          <button onClick={onCancel} className="px-4 py-2 text-slate-600 hover:bg-slate-200 rounded-lg text-xs">返回</button>
-          <button onClick={onComplete} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-medium flex items-center shadow">
-            <Save size={14} className="mr-1.5" />保存
-          </button>
+          <button onClick={onCancel} className="px-4 py-2 text-slate-600 hover:bg-slate-200 rounded-lg text-xs">返回上传列表</button>
           <button onClick={onGoToArchive} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium flex items-center shadow">
-            <Save size={14} className="mr-1.5" />入库
+            <Save size={14} className="mr-1.5" />确认入库
           </button>
         </div>
+      </div>
+      <div className="text-[10px] text-slate-400 px-6 py-1.5 border-b border-slate-200 bg-white flex items-center gap-1">
+        <a href="#" onClick={(e) => { e.preventDefault(); onCancel(); }} className="hover:text-blue-600">上传</a>
+        <span className="text-slate-300">›</span>
+        <a href="#" onClick={(e) => { e.preventDefault(); onCancel(); }} className="hover:text-blue-600">检测</a>
+        <span className="text-slate-300">›</span>
+        <span className="text-blue-600 font-medium">著录</span>
+        <span className="text-slate-300">›</span>
+        <a href="#" onClick={(e) => { e.preventDefault(); onGoToArchive(); }} className="hover:text-blue-600">确认入库</a>
       </div>
       <div className="flex flex-1 min-h-0">
         <div className="border-r border-slate-200 bg-white overflow-y-auto flex-shrink-0" style={{ width: treeWidth }}>
@@ -974,10 +983,11 @@ export const Step3Catalog: React.FC<Step3CatalogProps> = ({ treeData, selectedNo
           onMouseDown={handleMouseDown}
           className={`w-1.5 cursor-col-resize flex-shrink-0 transition-colors ${isDragging ? 'bg-blue-400' : 'bg-transparent hover:bg-slate-200'}`}
         />
-        <div className="flex-1 bg-slate-50/50 pl-3 py-3 overflow-y-auto">
+        <div className="flex-1 bg-slate-50/50 pl-3 py-3">
           <div className="space-y-3">
-            <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
-              <span className={`text-xs font-bold px-2 py-0.5 rounded ${
+            <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+              <div className="flex items-center gap-2">
+                <span className={`text-xs font-bold px-2 py-0.5 rounded ${
                 selectedNode.type === 'PROJECT' ? 'bg-blue-100 text-blue-700' :
                 selectedNode.type === 'UNIT' ? 'bg-emerald-100 text-emerald-700' :
                 selectedNode.type === 'VOLUME' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-700'
@@ -988,6 +998,12 @@ export const Step3Catalog: React.FC<Step3CatalogProps> = ({ treeData, selectedNo
               </span>
               <h3 className="text-sm font-bold text-slate-800 truncate">{selectedNode.label}</h3>
             </div>
+            <button onClick={handleSave} disabled={!isDirty}
+              className={`shrink-0 px-3 py-1 rounded-lg text-xs font-medium transition-colors ${isDirty ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}>
+              <Save size={12} className="inline mr-1" />保存
+            </button>
+
+          </div>
 
             {selectedNode.type === 'PROJECT' ? (
               <img src="/Meta_project.png" alt="项目级著录单" className="border border-slate-200 rounded-lg max-w-full" />

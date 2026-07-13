@@ -1,0 +1,617 @@
+import React, { useState, useMemo, useCallback } from 'react';
+import { Search, X, CheckSquare, Square, Eye, FolderOpen, Layers, Box, File, ChevronRight, RotateCcw } from 'lucide-react';
+import { SelectionItem } from '../types';
+import archiveData from '../data/archiveData.json';
+
+// ============================================================
+// Types
+// ============================================================
+
+interface TreeNode {
+  id: string;
+  type: 'PROJECT' | 'UNIT' | 'VOLUME' | 'FILE';
+  label: string;
+  data: Record<string, string>;
+  children: TreeNode[];
+  hitCount?: number;
+  matchedKeywords?: string[];
+  matchedField?: string;
+  directMatch?: boolean;
+  fieldPriority?: number;
+}
+
+interface ComprehensiveSearchProps {
+  basket: SelectionItem[];
+  setBasket: React.Dispatch<React.SetStateAction<SelectionItem[]>>;
+}
+
+// ============================================================
+// Constants
+// ============================================================
+
+const LEVEL_CONFIG: Record<string, { label: string; icon: any; color: string; border: string }> = {
+  PROJECT: { label: '项目级', icon: FolderOpen, color: 'bg-blue-100 text-blue-700', border: 'border-blue-200' },
+  UNIT: { label: '工程级', icon: Layers, color: 'bg-emerald-100 text-emerald-700', border: 'border-emerald-200' },
+  VOLUME: { label: '案卷级', icon: Box, color: 'bg-amber-100 text-amber-700', border: 'border-amber-200' },
+  FILE: { label: '文件级', icon: File, color: 'bg-slate-100 text-slate-700', border: 'border-slate-200' },
+};
+
+// Fields per level - only meaningful, non-date, non-numeric text fields
+// priority: 1 = title/name (highest), 2 = identifier/org, 3 = other
+const fieldMap: Record<string, { label: string; value: string; priority: number }[]> = {
+  PROJECT: [
+    { label: '项目名称', value: 'name', priority: 1 },
+    { label: '项目简称', value: 'projectShort', priority: 1 },
+    { label: '建设单位', value: 'buildCompany', priority: 2 },
+    { label: '施工单位', value: 'constructionCompany', priority: 2 },
+    { label: '监理单位', value: 'supervisorCompany', priority: 2 },
+    { label: '勘察单位', value: 'surveyCompany', priority: 2 },
+    { label: '设计单位', value: 'designCompany', priority: 2 },
+    { label: '立项批准文号', value: 'approvalNo', priority: 2 },
+    { label: '立项审批单位', value: 'approvalCompany', priority: 2 },
+    { label: '工程规划许可证号', value: 'itemPlanNo', priority: 2 },
+    { label: '施工许可证号', value: 'constructionNo', priority: 2 },
+    { label: '质监号', value: 'qualitySupervisionNo', priority: 2 },
+    { label: '用地规划许可证号', value: 'landPlanNo', priority: 2 },
+    { label: '用地许可证号', value: 'landNo', priority: 2 },
+    { label: '项目地点', value: 'location', priority: 3 },
+    { label: '移交单位', value: 'transferingCompany', priority: 2 },
+    { label: '项目负责人', value: 'leader', priority: 3 },
+    { label: '经办人', value: 'operator', priority: 3 },
+    { label: '附注', value: 'note', priority: 3 },
+  ],
+  UNIT: [
+    { label: '单位工程名称', value: 'name', priority: 1 },
+    { label: '施工单位', value: 'constructionCompany', priority: 2 },
+    { label: '质量安全监督单位', value: 'supervisorCompany', priority: 2 },
+    { label: '规划许可证号', value: 'planningNo', priority: 2 },
+    { label: '施工许可证号', value: 'constructionNo', priority: 2 },
+    { label: '移交单位', value: 'transferingCompany', priority: 2 },
+    { label: '附注', value: 'note', priority: 3 },
+  ],
+  VOLUME: [
+    { label: '案卷题名', value: 'volumeTitle', priority: 1 },
+    { label: '案卷类型', value: 'volumeType', priority: 2 },
+    { label: '编制单位', value: 'compilationCompany', priority: 2 },
+    { label: '载体类型', value: 'carrierType', priority: 3 },
+    { label: '主题词', value: 'subject', priority: 3 },
+    { label: '案卷整理人', value: 'sortBy', priority: 3 },
+    { label: '审核人', value: 'checkBy', priority: 3 },
+    { label: '备注', value: 'remark', priority: 3 },
+    { label: '附注', value: 'note', priority: 3 },
+  ],
+  FILE: [
+    { label: '文件题名', value: 'fileTitle', priority: 1 },
+    { label: '文件名称', value: 'name', priority: 1 },
+    { label: '文(图)号', value: 'docNo', priority: 2 },
+    { label: '责任者', value: 'responsible', priority: 2 },
+    { label: '缩微号', value: 'microfilmNo', priority: 2 },
+    { label: '摘要', value: 'summary', priority: 3 },
+    { label: '主题词', value: 'subject', priority: 3 },
+    { label: '备注', value: 'remark', priority: 3 },
+    { label: '附注', value: 'note', priority: 3 },
+  ],
+};
+
+// ============================================================
+// Tree Builder
+// ============================================================
+
+function buildTree(): TreeNode[] {
+  const items = archiveData as any[];
+
+  const getData = (item: any): Record<string, string> => {
+    const d: Record<string, string> = {};
+    // Map all fields from the JSON to our fieldMap keys
+    for (const level of Object.values(fieldMap)) {
+      for (const f of level) {
+        // Try the field value as-is first, then common variants
+        d[f.value] = item[f.value] || item[f.value.replace(/([A-Z])/g, '_$1').toLowerCase()] || '';
+      }
+    }
+    // Direct mappings from DB column names
+    d.name = item.file_name || '';
+    d.buildCompany = item.build_company || '';
+    d.constructionCompany = item.construction_company || '';
+    d.supervisorCompany = item.supervisor_company || '';
+    d.compilationCompany = item.compilation_company || '';
+    d.designCompany = item.design_company || '';
+    d.surveyCompany = item.survey_company || '';
+    d.approvalCompany = item.approval_company || '';
+    d.approvalNo = item.approval_no || '';
+    d.itemPlanNo = item.item_plan_no || '';
+    d.constructionNo = item.construction_no || '';
+    d.qualitySupervisionNo = item.quality_supervision_no || '';
+    d.landPlanNo = item.land_plan_no || '';
+    d.landNo = item.land_no || '';
+    d.location = item.location || '';
+    d.transferingCompany = item.transfering_company || '';
+    d.planningNo = item.planning_no || '';
+    d.storagePeriod = item.storage_period || '';
+    d.secrecyLevel = item.secrecy_level || '';
+    d.builtArea = item.built_area || '';
+    d.structureType = item.structure_type || '';
+    d.startTime = item.start_time || '';
+    d.endTime = item.end_time || '';
+    d.docNo = item.doc_no || '';
+    d.licenseNo = item.license_no || '';
+    d.carrierType = item.carrier_type || '';
+    d.archiveCode = item.archive_code || '';
+    d.fileTitle = item.file_title || '';
+    d.volumeTitle = item.volume_title || '';
+    d.volumeType = item.volume_type || '';
+    d.responsible = item.responsible || '';
+    d.microfilmNo = item.microfilm_no || '';
+    d.summary = item.summary || '';
+    d.subject = item.subject || '';
+    d.remark = item.remark || '';
+    d.note = item.note || '';
+    d.leader = item.leader || '';
+    d.operator = item.operator || '';
+    d.projectShort = item.project_short || '';
+    d.url = '/DemoFile1.pdf';
+    return d;
+  };
+
+  const buildChildren = (parentId: string): TreeNode[] => {
+    return items
+      .filter((i: any) => String(i.parent_id) === String(parentId))
+      .sort((a: any, b: any) => (parseInt(a.order_no) || 0) - (parseInt(b.order_no) || 0))
+      .map((item: any) => {
+        let type: TreeNode['type'] = 'FILE';
+        if (item.tag === 'zj') type = 'PROJECT';
+        else if (item.tag === 'zj_item') type = 'UNIT';
+        else if (item.tag === 'zj_volume') type = 'VOLUME';
+        else type = 'FILE';
+
+        return {
+          id: String(item.file_id),
+          type,
+          label: item.file_name || '',
+          data: getData(item),
+          children: buildChildren(item.file_id),
+        };
+      });
+  };
+
+  const proj = items.find((i: any) => i.tag === 'zj' && String(i.parent_id) === '0');
+  if (!proj) return [];
+
+  return [{
+    id: String(proj.file_id),
+    type: 'PROJECT',
+    label: proj.file_name || '',
+    data: getData(proj),
+    children: buildChildren(proj.file_id),
+  }];
+}
+
+// ============================================================
+// Search Engine
+// ============================================================
+
+function matchNode(node: TreeNode, keywords: string[], selectedLevels: string[]): { matched: boolean; keywords: string[]; field?: string; priority: number } {
+  if (!selectedLevels.includes(node.type)) return { matched: false, keywords: [], priority: 99 };
+
+  if (keywords.length === 0) return { matched: false, keywords: [], priority: 99 };
+
+  const fields = fieldMap[node.type] || [];
+  const matchedKws: string[] = [];
+  let matchedField = '';
+  let bestPriority = 99;
+
+  for (const kw of keywords) {
+    for (const f of fields) {
+      const val = (node.data[f.value] || '').toString().toLowerCase();
+      if (val.includes(kw)) {
+        matchedKws.push(kw);
+        if (f.priority < bestPriority) {
+          bestPriority = f.priority;
+          matchedField = f.label;
+        }
+        break;
+      }
+    }
+  }
+
+  const allMatched = keywords.every(kw => matchedKws.includes(kw));
+  return { matched: allMatched, keywords: matchedKws, field: matchedField, priority: allMatched ? bestPriority : 99 };
+}
+
+function searchTree(tree: TreeNode[], keywords: string[], selectedLevels: string[]): { results: TreeNode[]; totalHits: number } {
+  let totalHits = 0;
+
+  const search = (nodes: TreeNode[]): TreeNode[] => {
+    return nodes.map(node => {
+      const searchedChildren = search(node.children);
+      const nodeMatch = matchNode(node, keywords, selectedLevels);
+      const childHits = searchedChildren.reduce((sum, c) => sum + (c.hitCount || 0), 0);
+      const hitCount = (nodeMatch.matched ? 1 : 0) + childHits;
+
+      if (hitCount > 0) totalHits++;
+
+      return {
+        ...node,
+        children: searchedChildren,
+        hitCount,
+        matchedKeywords: nodeMatch.keywords,
+        matchedField: nodeMatch.field,
+        directMatch: nodeMatch.matched,
+        fieldPriority: nodeMatch.priority,
+      };
+    }).filter(node => (node.hitCount || 0) > 0);
+  };
+
+  const results = search(tree);
+  return { results, totalHits };
+}
+
+// ============================================================
+// Helpers
+// ============================================================
+
+function highlightText(text: string, keywords: string[]) {
+  if (!keywords.length) return text;
+  const parts: React.ReactNode[] = [];
+  let remaining = text;
+  let key = 0;
+
+  for (const kw of keywords) {
+    if (!kw.trim()) continue;
+    const idx = remaining.toLowerCase().indexOf(kw.toLowerCase());
+    if (idx === -1) continue;
+    if (idx > 0) parts.push(remaining.slice(0, idx));
+    parts.push(
+      <span key={key++} className="bg-yellow-200 text-yellow-900 px-0.5 rounded font-medium">
+        {remaining.slice(idx, idx + kw.length)}
+      </span>
+    );
+    remaining = remaining.slice(idx + kw.length);
+  }
+  if (remaining) parts.push(remaining);
+  return parts.length ? <>{parts}</> : text;
+}
+
+// ============================================================
+// Component
+// ============================================================
+
+export const ComprehensiveSearch: React.FC<ComprehensiveSearchProps> = ({ basket, setBasket }) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [executedTerm, setExecutedTerm] = useState('');
+  const [selectedLevels, setSelectedLevels] = useState<string[]>(['PROJECT', 'UNIT', 'VOLUME', 'FILE']);
+  const [selectedResult, setSelectedResult] = useState<TreeNode | null>(null);
+  const [previewTab, setPreviewTab] = useState<'meta' | 'preview'>('meta');
+  const [previewWidth, setPreviewWidth] = useState(560);
+  const [isDragging, setIsDragging] = useState(false);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+
+  const tree = useMemo(() => buildTree(), []);
+
+  const executedKeywords = useMemo(() => {
+    return executedTerm.trim().split(/\s+/).filter(k => k.length > 0);
+  }, [executedTerm]);
+
+  const { results, totalHits } = useMemo(() => {
+    if (executedKeywords.length === 0) return { results: [], totalHits: 0 };
+    return searchTree(tree, executedKeywords, selectedLevels);
+  }, [tree, executedKeywords, selectedLevels]);
+
+  // Auto-expand nodes with hits when search results change
+  React.useEffect(() => {
+    if (executedKeywords.length === 0) {
+      setExpandedIds(new Set());
+      setSelectedResult(null);
+      return;
+    }
+    const ids = new Set<string>();
+    const collect = (nodes: TreeNode[]) => {
+      for (const n of nodes) {
+        if ((n.hitCount || 0) > 0) {
+          ids.add(n.id);
+          collect(n.children);
+        }
+      }
+    };
+    collect(results);
+    setExpandedIds(ids);
+  }, [results]);
+
+  // Preview drag resize
+  React.useEffect(() => {
+    if (!isDragging) return;
+    const onMove = (e: MouseEvent) => {
+      const newW = window.innerWidth - e.clientX;
+      setPreviewWidth(Math.max(300, Math.min(800, newW)));
+    };
+    const onUp = () => setIsDragging(false);
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    return () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+  }, [isDragging]);
+
+  const handleSearch = useCallback(() => {
+    if (!searchTerm.trim()) return;
+    setExecutedTerm(searchTerm);
+  }, [searchTerm]);
+
+  const handleReset = useCallback(() => {
+    setSearchTerm('');
+    setExecutedTerm('');
+    setSelectedResult(null);
+    setExpandedIds(new Set());
+  }, []);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') handleSearch();
+  }, [handleSearch]);
+
+  const toggleExpand = useCallback((id: string) => {
+    setExpandedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const toggleLevel = (key: string) => setSelectedLevels(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
+
+  const isInBasket = (id: string, type: string) => basket.some(item => item.id === id && item.type === type);
+
+  const toggleBasket = (node: TreeNode) => {
+    if (isInBasket(node.id, node.type)) {
+      setBasket(prev => prev.filter(i => !(i.id === node.id && i.type === node.type)));
+    } else {
+      setBasket(prev => [...prev, { id: node.id, type: node.type, title: node.label, code: node.data.archiveCode || node.data.docNo || '' }]);
+    }
+  };
+
+  const getFieldLabel = (level: string, field: string) => (fieldMap[level] || []).find(f => f.value === field)?.label || field;
+
+  // ============================================================
+  // Tree Node Renderer
+  // ============================================================
+
+  const renderTreeNode = (node: TreeNode, depth: number = 0) => {
+    const lc = LEVEL_CONFIG[node.type];
+    const Icon = lc.icon;
+    const expanded = expandedIds.has(node.id);
+    const hasChildren = node.children.length > 0;
+    const sel = selectedResult?.id === node.id;
+    const hitCount = node.hitCount || 0;
+
+    return (
+      <div key={node.id}>
+        <div
+          className={`flex items-center gap-2 py-1.5 px-2 rounded-md cursor-pointer transition-colors group ${
+            sel ? 'bg-blue-50 border border-blue-200' : 'hover:bg-slate-50 border border-transparent'
+          }`}
+          style={{ paddingLeft: `${depth * 20 + 8}px` }}
+          onClick={() => { setSelectedResult(node); setPreviewTab('meta'); }}
+        >
+          {hasChildren ? (
+            <button
+              onClick={(e) => { e.stopPropagation(); toggleExpand(node.id); }}
+              className="w-4 h-4 flex items-center justify-center shrink-0 text-slate-400 hover:text-slate-600"
+            >
+              <ChevronRight size={12} className={`transition-transform ${expanded ? 'rotate-90' : ''}`} />
+            </button>
+          ) : (
+            <span className="w-4 h-4 shrink-0" />
+          )}
+
+          <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium shrink-0 ${lc.color}`}>
+            <Icon size={10} className="mr-0.5" />{lc.label}
+          </span>
+
+          <span className={`text-xs truncate ${sel ? 'text-blue-700 font-medium' : 'text-slate-800'}`}>
+            {executedKeywords.length > 0 ? highlightText(node.label, executedKeywords) : node.label}
+          </span>
+
+          {hitCount > 0 && (
+            <span className="ml-auto shrink-0 bg-blue-100 text-blue-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+              {hitCount}命中
+            </span>
+          )}
+
+          {node.directMatch && node.matchedField && (
+            <span className="text-[10px] text-slate-400 shrink-0">← {node.matchedField}</span>
+          )}
+
+          {(node.type === 'FILE' || node.type === 'VOLUME') && (
+            <button
+              onClick={(e) => { e.stopPropagation(); toggleBasket(node); }}
+              className="ml-auto shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+              {isInBasket(node.id, node.type) ? (
+                <CheckSquare size={14} className="text-blue-600" />
+              ) : (
+                <Square size={14} className="text-slate-300 hover:text-slate-500" />
+              )}
+            </button>
+          )}
+        </div>
+
+        {hasChildren && expanded && (
+          <div className="ml-2">
+            {node.children.map(child => renderTreeNode(child, depth + 1))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // ============================================================
+  // Meta Preview
+  // ============================================================
+
+  const renderMetaPreview = (node: TreeNode) => {
+    const lc = LEVEL_CONFIG[node.type];
+    const fields = fieldMap[node.type] || [];
+    return (
+      <div className="border border-slate-200 rounded-lg overflow-hidden">
+        <div className={`px-2 py-0.5 text-xs font-bold text-slate-700 text-center ${lc.color}`}>
+          {lc.label} — {node.label}
+        </div>
+        <div className="divide-y divide-slate-200">
+          {fields.map(f => (
+            <div key={f.value} className="flex">
+              <div className="w-[110px] shrink-0 bg-sky-50 px-1.5 py-1 text-xs font-semibold text-slate-700 border-r border-slate-200 flex items-center justify-center text-center">{f.label}</div>
+              <div className="flex-1 px-1.5 py-1 bg-white text-xs text-slate-800">{node.data[f.value] || '-'}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  // ============================================================
+  // Main Render
+  // ============================================================
+
+  const hasSearched = executedKeywords.length > 0;
+
+  return (
+    <div className="flex flex-col relative h-full">
+      {/* Header */}
+      <div className="mb-4 space-y-3 shrink-0">
+        <div>
+          <h2 className="text-lg font-bold text-slate-800">综合查询</h2>
+          <p className="text-[11px] text-slate-500">跨4级联合检索 · 多关键词空格分隔 · 结果按项目树形展示</p>
+        </div>
+        <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 space-y-3">
+          <div className="flex items-center gap-3">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+              <input type="text"
+                placeholder="输入关键词空格分隔，如：弘云科技 云计算 前期文件"
+                className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                value={searchTerm} onChange={e => setSearchTerm(e.target.value)} onKeyDown={handleKeyDown}
+              />
+            </div>
+            <button onClick={handleSearch} disabled={!searchTerm.trim()}
+              className={`px-4 py-2 rounded-lg text-xs font-medium transition-colors ${searchTerm.trim() ? 'bg-blue-600 text-white hover:bg-blue-700 shadow' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}>
+              <Search size={14} className="inline mr-1" />搜索
+            </button>
+            <button onClick={handleReset}
+              className="px-3 py-2 rounded-lg text-xs font-medium text-slate-600 border border-slate-200 hover:bg-slate-50 transition-colors">
+              <RotateCcw size={14} className="inline mr-1" />重置
+            </button>
+          </div>
+          <div className="flex items-center gap-3">
+            {Object.entries(LEVEL_CONFIG).map(([key, lc]) => {
+              const checked = selectedLevels.includes(key);
+              return (
+                <label key={key} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs cursor-pointer transition-colors ${checked ? lc.color + ' ' + lc.border : 'text-slate-400 border-slate-200 hover:bg-slate-50'}`}>
+                  <input type="checkbox" checked={checked} onChange={() => toggleLevel(key)} className="sr-only" />
+                  {React.createElement(lc.icon, { size: 13 })} {lc.label}
+                </label>
+              );
+            })}
+            {hasSearched && (
+              <span className="text-[10px] text-slate-400 ml-auto">
+                关键词：{executedKeywords.map((k, i) => <span key={i} className="bg-yellow-100 text-yellow-800 px-1 rounded mr-1">{k}</span>)}
+                · 命中 {totalHits} 个节点
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Main */}
+      <div className="flex-1 flex gap-4 overflow-hidden min-h-0">
+        {/* Results Tree */}
+        <div className="flex-1 bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden">
+          <div className="p-3 border-b border-slate-100 bg-slate-50/50 text-xs font-semibold text-slate-700">
+            检索结果
+            {hasSearched && <span className="font-normal text-slate-400 ml-1">({totalHits} 个匹配节点)</span>}
+          </div>
+          <div className="flex-1 overflow-y-auto p-2">
+            {!hasSearched ? (
+              <div className="text-center py-16 text-slate-400">
+                <Search size={40} className="mx-auto mb-3 opacity-20" />
+                <p className="text-xs">输入关键词点击搜索</p>
+              </div>
+            ) : results.length === 0 ? (
+              <div className="text-center py-16 text-slate-400">
+                <Search size={40} className="mx-auto mb-3 opacity-20" />
+                <p className="text-xs">未找到符合条件的档案</p>
+                <p className="text-[10px] mt-1">尝试调整关键词或扩大检索范围</p>
+              </div>
+            ) : (
+              <div className="space-y-0.5">
+                {results.map(node => renderTreeNode(node, 0))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Drag handle */}
+        <div
+          onMouseDown={() => setIsDragging(true)}
+          className={`w-[5px] shrink-0 cursor-col-resize transition-colors ${isDragging ? 'bg-blue-400' : 'hover:bg-slate-200'} rounded`}
+        />
+
+        {/* Preview Panel */}
+        <div style={{ width: previewWidth }} className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden hidden md:flex">
+          {selectedResult ? (
+            <>
+              <div className="p-3 border-b border-slate-200 bg-slate-50">
+                <div className="flex items-center gap-2 mb-2">
+                  {React.createElement(LEVEL_CONFIG[selectedResult.type].icon, { size: 14, className: 'text-slate-600 shrink-0' })}
+                  <h3 className="text-xs font-semibold text-slate-800 truncate">{selectedResult.label}</h3>
+                </div>
+                <div className="flex gap-1">
+                  <button onClick={() => setPreviewTab('meta')} className={`px-2 py-1 text-[10px] rounded ${previewTab === 'meta' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-700'}`}>
+                    元数据
+                  </button>
+                  {selectedResult.type === 'FILE' && (
+                    <button onClick={() => setPreviewTab('preview')} className={`px-2 py-1 text-[10px] rounded ${previewTab === 'preview' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-700'}`}>
+                      <Eye size={11} className="inline mr-1" />预览
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div className="flex-1 bg-white overflow-y-auto p-3">
+                {previewTab === 'meta' ? renderMetaPreview(selectedResult) : (
+                  <div className="border border-slate-200 rounded-lg overflow-hidden bg-white">
+                    {selectedResult.data.url ? (
+                      <embed src={selectedResult.data.url} type="application/pdf" className="w-full" style={{ height: '50vh' }} />
+                    ) : (
+                      <div className="text-center py-12 text-slate-400 text-xs">暂无文件预览</div>
+                    )}
+                  </div>
+                )}
+              </div>
+              <div className="p-2 bg-slate-50 border-t border-slate-200">
+                <button onClick={() => toggleBasket(selectedResult)} className={`w-full py-1.5 rounded text-[10px] font-medium transition-colors ${isInBasket(selectedResult.id, selectedResult.type) ? 'bg-blue-600 text-white' : 'text-slate-600 border border-slate-200 bg-white hover:bg-slate-50'}`}>
+                  {isInBasket(selectedResult.id, selectedResult.type) ? '✓ 已加入利用清单' : '+ 加入利用清单'}
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="flex-1 flex flex-col items-center justify-center text-slate-400">
+              <Eye size={36} className="mb-3 opacity-20" />
+              <p className="text-xs">选择检索结果查看详情</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Basket FAB */}
+      {basket.length > 0 && (
+        <div className="absolute bottom-4 right-4 bg-slate-800 text-white pr-2 rounded-full shadow-2xl flex items-center gap-3 z-30 border border-slate-700">
+          <div className="bg-blue-600 rounded-full w-9 h-9 flex items-center justify-center font-bold text-xs">{basket.length}</div>
+          <div className="text-[11px]">
+            <div className="font-bold">待利用清单</div>
+            <div className="text-[9px] text-slate-400">{basket.filter(i => i.type === 'FILE').length} 文件 · {basket.filter(i => i.type === 'VOLUME').length} 案卷</div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};

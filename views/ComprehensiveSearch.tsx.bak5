@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Search, X, CheckSquare, Square, Eye, FolderOpen, Layers, Box, File, Save, ChevronRight, ChevronLeft } from 'lucide-react';
+import { Search, Filter, Plus, X, CheckSquare, Square, Eye, Briefcase, FolderOpen, Layers, Box, File, Save } from 'lucide-react';
 import { SelectionItem } from '../types';
 import archiveData from '../data/archiveData.json';
 
@@ -10,18 +10,32 @@ const LEVEL_CONFIG = [
   { key: 'FILE', label: '文件级', icon: File, color: 'bg-slate-100 text-slate-700', border: 'border-slate-200' },
 ];
 
+const OPERATORS = [
+  { label: '包含', value: 'includes' },
+  { label: '等于', value: 'equals' },
+  { label: '不等于', value: 'notEquals' },
+  { label: '开始于', value: 'startsWith' },
+  { label: '结束于', value: 'endsWith' },
+];
+
+interface SearchCondition {
+  id: string;
+  level: string;
+  field: string;
+  operator: string;
+  value: string;
+}
+
 interface ComprehensiveSearchProps {
   basket: SelectionItem[];
   setBasket: React.Dispatch<React.SetStateAction<SelectionItem[]>>;
 }
 
-const ITEMS_PER_PAGE = 50;
-
 function buildSearchIndex() {
   const items = archiveData as any[];
   const flat: any[] = [];
 
-  // Build parent lookup for ancestry/breadcrumbs
+  // Build parent lookup for ancestry
   const parentMap = new Map<string, string>();
   items.forEach((i: any) => parentMap.set(i.file_id, i.parent_id));
 
@@ -63,7 +77,7 @@ function buildSearchIndex() {
     });
   });
 
-  return { flat, parentMap };
+  return flat;
 }
 
 const fieldMap: Record<string, { label: string; value: string }[]> = {
@@ -101,69 +115,57 @@ const fieldMap: Record<string, { label: string; value: string }[]> = {
   ],
 };
 
+interface ComprehensiveSearchProps {
+  basket: SelectionItem[];
+  setBasket: React.Dispatch<React.SetStateAction<SelectionItem[]>>;
+}
+
 export const ComprehensiveSearch: React.FC<ComprehensiveSearchProps> = ({ basket, setBasket }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [executedSearch, setExecutedSearch] = useState(''); // Only update on button click
   const [selectedLevels, setSelectedLevels] = useState<string[]>(['PROJECT', 'UNIT', 'VOLUME', 'FILE']);
   const [selectedResult, setSelectedResult] = useState<any>(null);
   const [previewTab, setPreviewTab] = useState<'meta' | 'preview'>('meta');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [leftWidth, setLeftWidth] = useState(50); // percentage
+  const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
+  const [conditions, setConditions] = useState<SearchCondition[]>([]);
+  const [advLevel, setAdvLevel] = useState('PROJECT');
+  const [advField, setAdvField] = useState('name');
+  const [advOperator, setAdvOperator] = useState('includes');
+  const [advValue, setAdvValue] = useState('');
+  const [previewWidth, setPreviewWidth] = useState(560);
   const [isDragging, setIsDragging] = useState(false);
 
-  const { flat: flatItems, parentMap } = useMemo(() => buildSearchIndex(), []);
+  const flatItems = useMemo(() => buildSearchIndex(), []);
 
-  // Build name map for breadcrumbs
-  const nameMap = useMemo(() => {
-    const map = new Map<string, string>();
-    flatItems.forEach(item => map.set(item.id, item.label));
-    return map;
-  }, [flatItems]);
-
-  // Multi-keyword AND search: split by spaces, all keywords must match
   const matchesSearch = (item: any): boolean => {
     if (!selectedLevels.includes(item.type)) return false;
-    if (!executedSearch.trim()) return true;
-    const keywords = executedSearch.trim().split(/\s+/).filter(k => k.length > 0);
-    if (keywords.length === 0) return true;
-    const allValues = Object.values(item.data).map((v: any) => String(v).toLowerCase()).join(' ');
-    return keywords.every(kw => allValues.includes(kw.toLowerCase()));
+    if (conditions.length > 0) {
+      return conditions.every(cond => {
+        if (cond.level !== item.type) return true;
+        const val = (item.data[cond.field] || '').toString().toLowerCase();
+        const sv = cond.value.toLowerCase();
+        switch (cond.operator) {
+          case 'includes': return val.includes(sv);
+          case 'equals': return val === sv;
+          case 'notEquals': return val !== sv;
+          case 'startsWith': return val.startsWith(sv);
+          case 'endsWith': return val.endsWith(sv);
+          default: return true;
+        }
+      });
+    }
+    if (!searchTerm.trim()) return true;
+    const kw = searchTerm.toLowerCase();
+    return Object.values(item.data).some((v: any) => String(v).toLowerCase().includes(kw));
   };
 
-  const filteredResults = useMemo(() => {
-    setCurrentPage(1); // Reset page when search changes
-    return flatItems.filter(matchesSearch);
-  }, [executedSearch, selectedLevels, flatItems]);
+  const filteredResults = useMemo(() => flatItems.filter(matchesSearch), [searchTerm, selectedLevels, conditions, flatItems]);
 
-  // Pagination
-  const totalPages = Math.ceil(filteredResults.length / ITEMS_PER_PAGE);
-  const paginatedResults = useMemo(() => {
-    const start = (currentPage - 1) * ITEMS_PER_PAGE;
-    return filteredResults.slice(start, start + ITEMS_PER_PAGE);
-  }, [filteredResults, currentPage]);
-
-  // Build breadcrumb path for selected result
-  const breadcrumbs = useMemo(() => {
-    if (!selectedResult) return [];
-    const path: { id: string; label: string; type: string }[] = [];
-    let currentId = selectedResult.id;
-    while (currentId && currentId !== '0') {
-      const item = flatItems.find(i => i.id === currentId);
-      if (item) {
-        path.unshift({ id: item.id, label: item.label, type: item.type });
-      }
-      currentId = parentMap.get(currentId) || '';
-    }
-    return path;
-  }, [selectedResult, flatItems, parentMap]);
-
-  // Drag resize
+  // Preview drag resize
   React.useEffect(() => {
     if (!isDragging) return;
     const onMove = (e: MouseEvent) => {
-      const containerWidth = window.innerWidth;
-      const pct = (e.clientX / containerWidth) * 100;
-      setLeftWidth(Math.max(20, Math.min(80, pct)));
+      const newW = window.innerWidth - e.clientX;
+      setPreviewWidth(Math.max(300, Math.min(800, newW)));
     };
     const onUp = () => setIsDragging(false);
     document.addEventListener('mousemove', onMove);
@@ -186,7 +188,17 @@ export const ComprehensiveSearch: React.FC<ComprehensiveSearchProps> = ({ basket
     }
   };
 
+  const addCondition = () => {
+    if (!advValue.trim()) return;
+    setConditions([...conditions, { id: Date.now().toString(), level: advLevel, field: advField, operator: advOperator, value: advValue }]);
+    setAdvValue('');
+  };
+
+  const removeCondition = (id: string) => setConditions(conditions.filter(c => c.id !== id));
+
+  const getFieldLabel = (level: string, field: string) => (fieldMap[level] || []).find(f => f.value === field)?.label || field;
   const getLevelConfig = (type: string) => LEVEL_CONFIG.find(l => l.key === type) || LEVEL_CONFIG[3];
+  const getOperatorLabel = (val: string) => OPERATORS.find(op => op.value === val)?.label || val;
 
   const renderMetaPreview = (item: any) => {
     const level = getLevelConfig(item.type);
@@ -214,24 +226,20 @@ export const ComprehensiveSearch: React.FC<ComprehensiveSearchProps> = ({ basket
       <div className="mb-4 space-y-3 shrink-0">
         <div>
           <h2 className="text-lg font-bold text-slate-800">综合查询</h2>
-          <p className="text-[11px] text-slate-500">跨4级联合检索 · 支持关键词模糊匹配</p>
+          <p className="text-[11px] text-slate-500">跨4级联合检索 · 支持多条件高级筛选</p>
         </div>
         <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 space-y-3">
           <div className="flex items-center gap-3">
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-              <input type="text" placeholder="输入关键词跨级检索，多个关键词空格分隔..."
+              <input type="text" placeholder="输入关键词跨级检索..."
                 className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') setExecutedSearch(searchTerm); }} />
+                value={searchTerm} onChange={e => setSearchTerm(e.target.value)} disabled={conditions.length > 0} />
             </div>
-            <button onClick={() => setExecutedSearch(searchTerm)}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 transition-colors shrink-0">
-              综合查询
-            </button>
-            <button onClick={() => { setSearchTerm(''); setExecutedSearch(''); setSelectedResult(null); }}
-              className="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg text-xs font-medium hover:bg-slate-200 transition-colors shrink-0">
-              重置
+            <button onClick={() => setIsAdvancedOpen(true)}
+              className={`flex items-center px-3 py-2 rounded-lg text-xs font-medium transition-colors ${conditions.length > 0 || isAdvancedOpen ? 'bg-blue-600 text-white shadow' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}>
+              <Filter size={15} className="mr-1.5" />高级筛选
+              {conditions.length > 0 && <span className="ml-1.5 bg-white text-blue-600 text-[10px] px-1.5 py-0.5 rounded-full font-bold">{conditions.length}</span>}
             </button>
           </div>
           <div className="flex items-center gap-3">
@@ -247,37 +255,26 @@ export const ComprehensiveSearch: React.FC<ComprehensiveSearchProps> = ({ basket
             <span className="text-[10px] text-slate-400 ml-auto">检索结果: {filteredResults.length} 条</span>
           </div>
         </div>
+        {conditions.length > 0 && !isAdvancedOpen && (
+          <div className="flex flex-wrap gap-2 items-center text-xs text-slate-500 bg-blue-50/50 p-2 rounded-lg border border-blue-100">
+            <span className="font-medium text-slate-700 mr-1">已应用条件:</span>
+            {conditions.map(cond => (
+              <div key={cond.id} className="bg-white border border-blue-200 text-blue-700 px-2 py-1 rounded flex items-center shadow-sm">
+                <span className="text-[10px] opacity-60 mr-1">{getLevelConfig(cond.level).label}</span>
+                <span>{getFieldLabel(cond.level, cond.field)} {getOperatorLabel(cond.operator)} "{cond.value}"</span>
+                <button onClick={() => removeCondition(cond.id)} className="ml-1.5 hover:text-red-500"><X size={11} /></button>
+              </div>
+            ))}
+            <button onClick={() => setConditions([])} className="ml-auto text-slate-400 hover:text-slate-600 underline text-[10px]">清除所有</button>
+          </div>
+        )}
       </div>
 
-      {/* Breadcrumb - always visible */}
-      <div className="mb-2 px-3 py-2 bg-slate-50 rounded-lg border border-slate-200 flex items-center gap-1 flex-wrap shrink-0 min-h-[36px]">
-        {selectedResult && breadcrumbs.length > 0 ? (
-          breadcrumbs.map((crumb, idx) => {
-            const lc = getLevelConfig(crumb.type);
-            const Icon = lc.icon;
-            const isLast = idx === breadcrumbs.length - 1;
-            return (
-              <React.Fragment key={crumb.id}>
-                {idx > 0 && <ChevronRight size={12} className="text-slate-300 shrink-0" />}
-                <span className={`inline-flex items-center gap-1 text-xs whitespace-nowrap ${isLast ? 'text-blue-700 font-medium' : 'text-slate-500'}`}>
-                  <Icon size={12} className="shrink-0" />
-                  <span>{crumb.label}</span>
-                </span>
-              </React.Fragment>
-            );
-          })
-        ) : (
-          <span className="text-xs text-slate-400">选择检索结果后显示归属路径</span>
-        )}
-        </div>
-
       {/* Main */}
-      <div className="flex-1 flex overflow-hidden min-h-0">
+      <div className="flex-1 flex gap-4 overflow-hidden min-h-0">
         {/* Results */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden" style={{ width: `${leftWidth}%` }}>
-          <div className="p-3 border-b border-slate-100 bg-slate-50/50 text-xs font-semibold text-slate-700">
-            检索结果 ({filteredResults.length})
-          </div>
+        <div className="flex-1 bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden">
+          <div className="p-3 border-b border-slate-100 bg-slate-50/50 text-xs font-semibold text-slate-700">检索结果 ({filteredResults.length})</div>
           <div className="flex-1 overflow-y-auto p-2 space-y-1">
             {filteredResults.length === 0 ? (
               <div className="text-center py-16 text-slate-400">
@@ -285,7 +282,7 @@ export const ComprehensiveSearch: React.FC<ComprehensiveSearchProps> = ({ basket
                 <p className="text-xs">未找到符合条件的档案</p>
               </div>
             ) : (
-              paginatedResults.map(item => {
+              filteredResults.map(item => {
                 const lc = getLevelConfig(item.type);
                 const Icon = lc.icon;
                 const sel = selectedResult?.id === item.id;
@@ -308,56 +305,23 @@ export const ComprehensiveSearch: React.FC<ComprehensiveSearchProps> = ({ basket
               })
             )}
           </div>
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="p-2 border-t border-slate-100 bg-slate-50/50 flex items-center justify-center gap-1">
-              <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}
-                className="px-2 py-1 rounded text-xs hover:bg-slate-200 disabled:opacity-30 disabled:cursor-not-allowed text-slate-600">
-                &lt;
-              </button>
-              {(() => {
-                const pages: (number | string)[] = [];
-                if (totalPages <= 7) {
-                  for (let i = 1; i <= totalPages; i++) pages.push(i);
-                } else {
-                  pages.push(1);
-                  if (currentPage > 3) pages.push('...');
-                  for (let i = Math.max(2, currentPage - 1); i <= Math.min(totalPages - 1, currentPage + 1); i++) {
-                    pages.push(i);
-                  }
-                  if (currentPage < totalPages - 2) pages.push('...');
-                  pages.push(totalPages);
-                }
-                return pages.map((p, idx) =>
-                  typeof p === 'string' ? (
-                    <span key={`ellipsis-${idx}`} className="px-1 text-xs text-slate-400">...</span>
-                  ) : (
-                    <button key={p} onClick={() => setCurrentPage(p)}
-                      className={`px-2.5 py-1 rounded text-xs transition-colors ${p === currentPage ? 'bg-blue-600 text-white font-medium' : 'hover:bg-slate-200 text-slate-600'}`}>
-                      {p}
-                    </button>
-                  )
-                );
-              })()}
-              <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}
-                className="px-2 py-1 rounded text-xs hover:bg-slate-200 disabled:opacity-30 disabled:cursor-not-allowed text-slate-600">
-                &gt;
-              </button>
-            </div>
-          )}
         </div>
 
         {/* Drag handle */}
         <div
           onMouseDown={() => setIsDragging(true)}
-          className={`w-[5px] shrink-0 cursor-col-resize mx-1 transition-colors ${isDragging ? 'bg-blue-400' : 'hover:bg-slate-200'} rounded`}
+          className={`w-[5px] shrink-0 cursor-col-resize transition-colors ${isDragging ? 'bg-blue-400' : 'hover:bg-slate-200'} rounded`}
         />
 
         {/* Preview */}
-        <div className="bg-slate-800 rounded-xl shadow-lg border border-slate-700 flex flex-col overflow-hidden" style={{ width: `${100 - leftWidth}%` }}>
+        <div style={{ width: previewWidth }} className="bg-slate-800 rounded-xl shadow-lg border border-slate-700 flex flex-col overflow-hidden hidden md:flex">
           {selectedResult ? (
             <>
               <div className="p-3 border-b border-slate-700 bg-slate-900/50">
+                <div className="flex items-center gap-2 mb-2">
+                  {React.createElement(getLevelConfig(selectedResult.type).icon, { size: 14, className: 'text-white shrink-0' })}
+                  <h3 className="text-xs font-semibold text-white truncate">{selectedResult.label}</h3>
+                </div>
                 <div className="flex gap-1">
                   <button onClick={() => setPreviewTab('meta')} className={`px-2 py-1 text-[10px] rounded ${previewTab === 'meta' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}>
                     <Save size={11} className="inline mr-1" />元数据
@@ -398,6 +362,67 @@ export const ComprehensiveSearch: React.FC<ComprehensiveSearchProps> = ({ basket
           <div className="text-[11px]">
             <div className="font-bold">待利用清单</div>
             <div className="text-[9px] text-slate-400">{basket.filter(i => i.type === 'FILE').length} 文件 · {basket.filter(i => i.type === 'VOLUME').length} 案卷</div>
+          </div>
+        </div>
+      )}
+
+      {/* Advanced Search */}
+      {isAdvancedOpen && (
+        <div className="absolute inset-0 z-40 overflow-hidden">
+          <div className="absolute inset-0 bg-slate-900/20 backdrop-blur-[1px]" onClick={() => setIsAdvancedOpen(false)} />
+          <div className="absolute inset-y-0 right-0 w-[520px] bg-white shadow-2xl border-l border-slate-200 flex flex-col">
+            <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <div className="flex items-center"><Filter className="text-blue-600 mr-2" size={18} /><h3 className="font-bold text-sm text-slate-800">高级筛选</h3></div>
+              <button onClick={() => setIsAdvancedOpen(false)}><X size={18} className="text-slate-400 hover:text-slate-600" /></button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-4">
+                <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3">添加条件</h4>
+                <div className="grid grid-cols-4 gap-2">
+                  <div>
+                    <label className="block text-[10px] font-medium text-slate-600 mb-1">层级</label>
+                    <select className="w-full p-2 border border-slate-300 rounded-lg text-xs" value={advLevel} onChange={e => { setAdvLevel(e.target.value); setAdvField('name'); }}>
+                      {LEVEL_CONFIG.map(lc => <option key={lc.key} value={lc.key}>{lc.label}</option>)}
+                    </select>
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-[10px] font-medium text-slate-600 mb-1">字段</label>
+                    <select className="w-full p-2 border border-slate-300 rounded-lg text-xs" value={advField} onChange={e => setAdvField(e.target.value)}>
+                      {(fieldMap[advLevel] || []).map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-medium text-slate-600 mb-1">操作符</label>
+                    <select className="w-full p-2 border border-slate-300 rounded-lg text-xs" value={advOperator} onChange={e => setAdvOperator(e.target.value)}>
+                      {OPERATORS.map(op => <option key={op.value} value={op.value}>{op.label}</option>)}
+                    </select>
+                  </div>
+                  <div className="col-span-3">
+                    <label className="block text-[10px] font-medium text-slate-600 mb-1">值</label>
+                    <input type="text" className="w-full p-2 border border-slate-300 rounded-lg text-xs" placeholder="输入关键词..." value={advValue} onChange={e => setAdvValue(e.target.value)} />
+                  </div>
+                  <div className="flex items-end">
+                    <button onClick={addCondition} disabled={!advValue.trim()} className="w-full p-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white rounded-lg flex justify-center items-center"><Plus size={18} /></button>
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                {conditions.map(cond => (
+                  <div key={cond.id} className="bg-white p-2 rounded-lg border border-slate-200 flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-xs">
+                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${getLevelConfig(cond.level).color}`}>{getLevelConfig(cond.level).label}</span>
+                      <span className="font-medium text-slate-700">{getFieldLabel(cond.level, cond.field)}</span>
+                      <span className="text-blue-600">{getOperatorLabel(cond.operator)}</span>
+                      <span className="text-slate-800">"{cond.value}"</span>
+                    </div>
+                    <button onClick={() => removeCondition(cond.id)} className="text-slate-300 hover:text-red-500"><X size={14} /></button>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="p-3 border-t border-slate-200 bg-slate-50">
+              <button onClick={() => setIsAdvancedOpen(false)} className="w-full py-2.5 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 shadow">应用筛选</button>
+            </div>
           </div>
         </div>
       )}

@@ -1,0 +1,671 @@
+import React, { useState, useMemo, useCallback } from 'react';
+import { Search, Filter, Plus, X, CheckSquare, Square, Eye, Briefcase, FolderOpen, Layers, Box, File, Save, ChevronRight } from 'lucide-react';
+import { SelectionItem } from '../types';
+import archiveData from '../data/archiveData.json';
+
+// ============================================================
+// Types
+// ============================================================
+
+interface TreeNode {
+  id: string;
+  type: 'PROJECT' | 'UNIT' | 'VOLUME' | 'FILE';
+  label: string;
+  data: Record<string, string>;
+  children: TreeNode[];
+  // Search result fields (populated after search)
+  hitCount?: number;
+  matchedKeywords?: string[];
+  matchedField?: string;
+  directMatch?: boolean;
+}
+
+interface SearchCondition {
+  id: string;
+  level: string;
+  field: string;
+  operator: string;
+  value: string;
+}
+
+interface ComprehensiveSearchProps {
+  basket: SelectionItem[];
+  setBasket: React.Dispatch<React.SetStateAction<SelectionItem[]>>;
+}
+
+// ============================================================
+// Constants
+// ============================================================
+
+const LEVEL_CONFIG: Record<string, { label: string; icon: any; color: string; border: string }> = {
+  PROJECT: { label: '项目级', icon: FolderOpen, color: 'bg-blue-100 text-blue-700', border: 'border-blue-200' },
+  UNIT: { label: '工程级', icon: Layers, color: 'bg-emerald-100 text-emerald-700', border: 'border-emerald-200' },
+  VOLUME: { label: '案卷级', icon: Box, color: 'bg-amber-100 text-amber-700', border: 'border-amber-200' },
+  FILE: { label: '文件级', icon: File, color: 'bg-slate-100 text-slate-700', border: 'border-slate-200' },
+};
+
+const OPERATORS = [
+  { label: '包含', value: 'includes' },
+  { label: '等于', value: 'equals' },
+  { label: '不等于', value: 'notEquals' },
+  { label: '开始于', value: 'startsWith' },
+  { label: '结束于', value: 'endsWith' },
+];
+
+const fieldMap: Record<string, { label: string; value: string }[]> = {
+  PROJECT: [
+    { label: '项目名称', value: 'name' },
+    { label: '建设单位', value: 'constructionCompany' },
+    { label: '监理单位', value: 'supervisorCompany' },
+    { label: '设计单位', value: 'compilationCompany' },
+    { label: '立项文号', value: 'docNo' },
+    { label: '规划许可证号', value: 'licenseNo' },
+  ],
+  UNIT: [
+    { label: '单位工程名称', value: 'name' },
+    { label: '施工单位', value: 'constructionCompany' },
+    { label: '质量监督单位', value: 'supervisorCompany' },
+    { label: '建筑面积', value: 'builtArea' },
+    { label: '结构类型', value: 'structureType' },
+    { label: '开工时间', value: 'startTime' },
+    { label: '竣工时间', value: 'endTime' },
+  ],
+  VOLUME: [
+    { label: '案卷题名', value: 'name' },
+    { label: '编制单位', value: 'compilationCompany' },
+    { label: '保管期限', value: 'storagePeriod' },
+    { label: '密级', value: 'secrecyLevel' },
+    { label: '载体类型', value: 'carrierType' },
+    { label: '卷内起始时间', value: 'startTime' },
+    { label: '卷内终止时间', value: 'endTime' },
+  ],
+  FILE: [
+    { label: '文件题名', value: 'name' },
+    { label: '责任者', value: 'compilationCompany' },
+    { label: '保管期限', value: 'storagePeriod' },
+    { label: '密级', value: 'secrecyLevel' },
+  ],
+};
+
+// ============================================================
+// Tree Builder
+// ============================================================
+
+function buildTree(): TreeNode[] {
+  const items = archiveData as any[];
+  const getData = (item: any): Record<string, string> => ({
+    name: item.file_name || '',
+    constructionCompany: item.construction_company || '',
+    supervisorCompany: item.supervisor_company || '',
+    compilationCompany: item.compilation_company || '',
+    storagePeriod: item.storage_period || '',
+    secrecyLevel: item.secrecy_level || '',
+    builtArea: item.built_area || '',
+    height: item.height || '',
+    structureType: item.structure_type || '',
+    underFloor: item.under_floor || '',
+    upFloor: item.up_floor || '',
+    startTime: item.start_time || '',
+    endTime: item.end_time || '',
+    docNo: item.doc_no || '',
+    licenseNo: item.license_no || '',
+    carrierType: item.carrier_type || '',
+    archiveCode: item.archive_code || '',
+    url: '/DemoFile1.pdf',
+  });
+
+  const buildChildren = (parentId: string): TreeNode[] => {
+    return items
+      .filter((i: any) => i.parent_id === parentId)
+      .sort((a: any, b: any) => (parseInt(a.order_no) || 0) - (parseInt(b.order_no) || 0))
+      .map((item: any) => {
+        let type: TreeNode['type'] = 'FILE';
+        if (item.tag === 'zj') type = 'PROJECT';
+        else if (item.tag === 'zj_item') type = 'UNIT';
+        else if (item.tag === 'zj_volume') type = 'VOLUME';
+        else type = 'FILE';
+
+        return {
+          id: item.file_id,
+          type,
+          label: item.file_name || '',
+          data: getData(item),
+          children: buildChildren(item.file_id),
+        };
+      });
+  };
+
+  // Find root project
+  const proj = items.find((i: any) => i.tag === 'zj' && i.parent_id === '0');
+  if (!proj) return [];
+
+  return [{
+    id: proj.file_id,
+    type: 'PROJECT',
+    label: proj.file_name || '',
+    data: getData(proj),
+    children: buildChildren(proj.file_id),
+  }];
+}
+
+// ============================================================
+// Search Engine
+// ============================================================
+
+function matchNode(node: TreeNode, keywords: string[], conditions: SearchCondition[], selectedLevels: string[]): { matched: boolean; keywords: string[]; field?: string } {
+  if (!selectedLevels.includes(node.type)) return { matched: false, keywords: [] };
+
+  // Advanced conditions mode
+  if (conditions.length > 0) {
+    const allMet = conditions.every(cond => {
+      if (cond.level !== node.type) return true;
+      const val = (node.data[cond.field] || '').toString().toLowerCase();
+      const sv = cond.value.toLowerCase();
+      switch (cond.operator) {
+        case 'includes': return val.includes(sv);
+        case 'equals': return val === sv;
+        case 'notEquals': return val !== sv;
+        case 'startsWith': return val.startsWith(sv);
+        case 'endsWith': return val.endsWith(sv);
+        default: return true;
+      }
+    });
+    return { matched: allMet, keywords: [] };
+  }
+
+  // Keywords mode
+  if (keywords.length === 0) return { matched: false, keywords: [] };
+
+  const fields = fieldMap[node.type] || [];
+  const matchedKws: string[] = [];
+  let matchedField = '';
+
+  for (const kw of keywords) {
+    for (const f of fields) {
+      const val = (node.data[f.value] || '').toString().toLowerCase();
+      if (val.includes(kw)) {
+        matchedKws.push(kw);
+        if (!matchedField) matchedField = f.label;
+        break;
+      }
+    }
+  }
+
+  // AND logic: all keywords must match
+  const allMatched = keywords.every(kw => matchedKws.includes(kw));
+  return { matched: allMatched, keywords: matchedKws, field: matchedField };
+}
+
+function searchTree(tree: TreeNode[], keywords: string[], conditions: SearchCondition[], selectedLevels: string[]): { results: TreeNode[]; totalHits: number } {
+  let totalHits = 0;
+
+  const search = (nodes: TreeNode[]): TreeNode[] => {
+    return nodes.map(node => {
+      // First search children recursively
+      const searchedChildren = search(node.children);
+
+      // Then match this node
+      const nodeMatch = matchNode(node, keywords, conditions, selectedLevels);
+
+      // Calculate hit count: own matches + children's hit counts
+      const childHits = searchedChildren.reduce((sum, c) => sum + (c.hitCount || 0), 0);
+      const hitCount = (nodeMatch.matched ? 1 : 0) + childHits;
+
+      if (hitCount > 0) totalHits++;
+
+      return {
+        ...node,
+        children: searchedChildren,
+        hitCount,
+        matchedKeywords: nodeMatch.keywords,
+        matchedField: nodeMatch.field,
+        directMatch: nodeMatch.matched,
+      };
+    }).filter(node => (node.hitCount || 0) > 0);
+  };
+
+  const results = search(tree);
+  return { results, totalHits };
+}
+
+// ============================================================
+// Helpers
+// ============================================================
+
+function highlightText(text: string, keywords: string[]) {
+  if (!keywords.length) return text;
+  const parts: React.ReactNode[] = [];
+  let remaining = text;
+  let key = 0;
+
+  for (const kw of keywords) {
+    if (!kw.trim()) continue;
+    const idx = remaining.toLowerCase().indexOf(kw.toLowerCase());
+    if (idx === -1) continue;
+    if (idx > 0) parts.push(remaining.slice(0, idx));
+    parts.push(
+      <span key={key++} className="bg-yellow-200 text-yellow-900 px-0.5 rounded font-medium">
+        {remaining.slice(idx, idx + kw.length)}
+      </span>
+    );
+    remaining = remaining.slice(idx + kw.length);
+  }
+  if (remaining) parts.push(remaining);
+  return parts.length ? <>{parts}</> : text;
+}
+
+// ============================================================
+// Component
+// ============================================================
+
+export const ComprehensiveSearch: React.FC<ComprehensiveSearchProps> = ({ basket, setBasket }) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedLevels, setSelectedLevels] = useState<string[]>(['PROJECT', 'UNIT', 'VOLUME', 'FILE']);
+  const [selectedResult, setSelectedResult] = useState<TreeNode | null>(null);
+  const [previewTab, setPreviewTab] = useState<'meta' | 'preview'>('meta');
+  const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
+  const [conditions, setConditions] = useState<SearchCondition[]>([]);
+  const [advLevel, setAdvLevel] = useState('PROJECT');
+  const [advField, setAdvField] = useState('name');
+  const [advOperator, setAdvOperator] = useState('includes');
+  const [advValue, setAdvValue] = useState('');
+  const [previewWidth, setPreviewWidth] = useState(560);
+  const [isDragging, setIsDragging] = useState(false);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+
+  const tree = useMemo(() => buildTree(), []);
+
+  const keywords = useMemo(() => {
+    return searchTerm.trim().split(/\s+/).filter(k => k.length > 0);
+  }, [searchTerm]);
+
+  const { results, totalHits } = useMemo(() => {
+    if (keywords.length === 0 && conditions.length === 0) return { results: [], totalHits: 0 };
+    return searchTree(tree, keywords, conditions, selectedLevels);
+  }, [tree, keywords, conditions, selectedLevels]);
+
+  // Auto-expand nodes with hits when search results change
+  React.useEffect(() => {
+    if (keywords.length === 0 && conditions.length === 0) {
+      setExpandedIds(new Set());
+      return;
+    }
+    const ids = new Set<string>();
+    const collect = (nodes: TreeNode[]) => {
+      for (const n of nodes) {
+        if ((n.hitCount || 0) > 0) {
+          ids.add(n.id);
+          collect(n.children);
+        }
+      }
+    };
+    collect(results);
+    setExpandedIds(ids);
+  }, [results]);
+
+  // Preview drag resize
+  React.useEffect(() => {
+    if (!isDragging) return;
+    const onMove = (e: MouseEvent) => {
+      const newW = window.innerWidth - e.clientX;
+      setPreviewWidth(Math.max(300, Math.min(800, newW)));
+    };
+    const onUp = () => setIsDragging(false);
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    return () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+  }, [isDragging]);
+
+  const toggleExpand = useCallback((id: string) => {
+    setExpandedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const toggleLevel = (key: string) => setSelectedLevels(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
+
+  const isInBasket = (id: string, type: string) => basket.some(item => item.id === id && item.type === type);
+
+  const toggleBasket = (node: TreeNode) => {
+    if (isInBasket(node.id, node.type)) {
+      setBasket(prev => prev.filter(i => !(i.id === node.id && i.type === node.type)));
+    } else {
+      setBasket(prev => [...prev, { id: node.id, type: node.type, title: node.label, code: node.data.archiveCode || node.data.docNo || '' }]);
+    }
+  };
+
+  const addCondition = () => {
+    if (!advValue.trim()) return;
+    setConditions([...conditions, { id: Date.now().toString(), level: advLevel, field: advField, operator: advOperator, value: advValue }]);
+    setAdvValue('');
+  };
+
+  const removeCondition = (id: string) => setConditions(conditions.filter(c => c.id !== id));
+
+  const getFieldLabel = (level: string, field: string) => (fieldMap[level] || []).find(f => f.value === field)?.label || field;
+  const getOperatorLabel = (val: string) => OPERATORS.find(op => op.value === val)?.label || val;
+
+  // ============================================================
+  // Tree Node Renderer
+  // ============================================================
+
+  const renderTreeNode = (node: TreeNode, depth: number = 0) => {
+    const lc = LEVEL_CONFIG[node.type];
+    const Icon = lc.icon;
+    const expanded = expandedIds.has(node.id);
+    const hasChildren = node.children.length > 0;
+    const sel = selectedResult?.id === node.id;
+    const hitCount = node.hitCount || 0;
+
+    return (
+      <div key={node.id}>
+        <div
+          className={`flex items-center gap-2 py-1.5 px-2 rounded-md cursor-pointer transition-colors group ${
+            sel ? 'bg-blue-50 border border-blue-200' : 'hover:bg-slate-50 border border-transparent'
+          }`}
+          style={{ paddingLeft: `${depth * 20 + 8}px` }}
+          onClick={() => { setSelectedResult(node); setPreviewTab('meta'); }}
+        >
+          {/* Expand/collapse button */}
+          {hasChildren ? (
+            <button
+              onClick={(e) => { e.stopPropagation(); toggleExpand(node.id); }}
+              className="w-4 h-4 flex items-center justify-center shrink-0 text-slate-400 hover:text-slate-600"
+            >
+              <ChevronRight size={12} className={`transition-transform ${expanded ? 'rotate-90' : ''}`} />
+            </button>
+          ) : (
+            <span className="w-4 h-4 shrink-0" />
+          )}
+
+          {/* Level badge */}
+          <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium shrink-0 ${lc.color}`}>
+            <Icon size={10} className="mr-0.5" />{lc.label}
+          </span>
+
+          {/* Label with keyword highlighting */}
+          <span className={`text-xs truncate ${sel ? 'text-blue-700 font-medium' : 'text-slate-800'}`}>
+            {keywords.length > 0 ? highlightText(node.label, keywords) : node.label}
+          </span>
+
+          {/* Hit count badge */}
+          {hitCount > 0 && (
+            <span className="ml-auto shrink-0 bg-blue-100 text-blue-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+              {hitCount}命中
+            </span>
+          )}
+
+          {/* Matched field hint */}
+          {node.directMatch && node.matchedField && (
+            <span className="text-[10px] text-slate-400 shrink-0">← {node.matchedField}</span>
+          )}
+
+          {/* Basket button (for files/volumes) */}
+          {(node.type === 'FILE' || node.type === 'VOLUME') && (
+            <button
+              onClick={(e) => { e.stopPropagation(); toggleBasket(node); }}
+              className="ml-auto shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+              {isInBasket(node.id, node.type) ? (
+                <CheckSquare size={14} className="text-blue-600" />
+              ) : (
+                <Square size={14} className="text-slate-300 hover:text-slate-500" />
+              )}
+            </button>
+          )}
+        </div>
+
+        {/* Children */}
+        {hasChildren && expanded && (
+          <div className="ml-2">
+            {node.children.map(child => renderTreeNode(child, depth + 1))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // ============================================================
+  // Meta Preview
+  // ============================================================
+
+  const renderMetaPreview = (node: TreeNode) => {
+    const lc = LEVEL_CONFIG[node.type];
+    const fields = fieldMap[node.type] || [];
+    return (
+      <div className="border border-slate-200 rounded-lg overflow-hidden">
+        <div className={`px-2 py-0.5 text-xs font-bold text-slate-700 text-center ${lc.color}`}>
+          {lc.label} — {node.label}
+        </div>
+        <div className="divide-y divide-slate-200">
+          {fields.map(f => (
+            <div key={f.value} className="flex">
+              <div className="w-[110px] shrink-0 bg-sky-50 px-1.5 py-1 text-xs font-semibold text-slate-700 border-r border-slate-200 flex items-center justify-center text-center">{f.label}</div>
+              <div className="flex-1 px-1.5 py-1 bg-white text-xs text-slate-800">{node.data[f.value] || '-'}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  // ============================================================
+  // Main Render
+  // ============================================================
+
+  return (
+    <div className="flex flex-col relative h-full">
+      {/* Header */}
+      <div className="mb-4 space-y-3 shrink-0">
+        <div>
+          <h2 className="text-lg font-bold text-slate-800">综合查询</h2>
+          <p className="text-[11px] text-slate-500">跨4级联合检索 · 输入多个关键词空格分隔 · 结果按项目树形展示</p>
+        </div>
+        <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 space-y-3">
+          <div className="flex items-center gap-3">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+              <input type="text"
+                placeholder="输入关键词空格分隔，如：弘云科技 云计算 前期文件 图纸变更"
+                className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                value={searchTerm} onChange={e => setSearchTerm(e.target.value)} disabled={conditions.length > 0}
+              />
+            </div>
+            <button onClick={() => setIsAdvancedOpen(true)}
+              className={`flex items-center px-3 py-2 rounded-lg text-xs font-medium transition-colors ${conditions.length > 0 || isAdvancedOpen ? 'bg-blue-600 text-white shadow' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}>
+              <Filter size={15} className="mr-1.5" />高级筛选
+              {conditions.length > 0 && <span className="ml-1.5 bg-white text-blue-600 text-[10px] px-1.5 py-0.5 rounded-full font-bold">{conditions.length}</span>}
+            </button>
+          </div>
+          <div className="flex items-center gap-3">
+            {Object.entries(LEVEL_CONFIG).map(([key, lc]) => {
+              const checked = selectedLevels.includes(key);
+              return (
+                <label key={key} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs cursor-pointer transition-colors ${checked ? lc.color + ' ' + lc.border : 'text-slate-400 border-slate-200 hover:bg-slate-50'}`}>
+                  <input type="checkbox" checked={checked} onChange={() => toggleLevel(key)} className="sr-only" />
+                  {React.createElement(lc.icon, { size: 13 })} {lc.label}
+                </label>
+              );
+            })}
+            {keywords.length > 0 && (
+              <span className="text-[10px] text-slate-400 ml-auto">
+                关键词：{keywords.map((k, i) => <span key={i} className="bg-yellow-100 text-yellow-800 px-1 rounded mr-1">{k}</span>)}
+                · 命中 {totalHits} 个节点
+              </span>
+            )}
+          </div>
+        </div>
+        {conditions.length > 0 && !isAdvancedOpen && (
+          <div className="flex flex-wrap gap-2 items-center text-xs text-slate-500 bg-blue-50/50 p-2 rounded-lg border border-blue-100">
+            <span className="font-medium text-slate-700 mr-1">已应用条件:</span>
+            {conditions.map(cond => (
+              <div key={cond.id} className="bg-white border border-blue-200 text-blue-700 px-2 py-1 rounded flex items-center shadow-sm">
+                <span className="text-[10px] opacity-60 mr-1">{LEVEL_CONFIG[cond.level]?.label}</span>
+                <span>{getFieldLabel(cond.level, cond.field)} {getOperatorLabel(cond.operator)} "{cond.value}"</span>
+                <button onClick={() => removeCondition(cond.id)} className="ml-1.5 hover:text-red-500"><X size={11} /></button>
+              </div>
+            ))}
+            <button onClick={() => setConditions([])} className="ml-auto text-slate-400 hover:text-slate-600 underline text-[10px]">清除所有</button>
+          </div>
+        )}
+      </div>
+
+      {/* Main */}
+      <div className="flex-1 flex gap-4 overflow-hidden min-h-0">
+        {/* Results Tree */}
+        <div className="flex-1 bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden">
+          <div className="p-3 border-b border-slate-100 bg-slate-50/50 text-xs font-semibold text-slate-700">
+            检索结果
+            {keywords.length > 0 && <span className="font-normal text-slate-400 ml-1">({totalHits} 个匹配节点)</span>}
+          </div>
+          <div className="flex-1 overflow-y-auto p-2">
+            {results.length === 0 ? (
+              <div className="text-center py-16 text-slate-400">
+                <Search size={40} className="mx-auto mb-3 opacity-20" />
+                <p className="text-xs">
+                  {keywords.length === 0 ? '输入关键词开始检索' : '未找到符合条件的档案'}
+                </p>
+                {keywords.length > 0 && (
+                  <p className="text-[10px] mt-1">尝试调整关键词或扩大检索范围</p>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-0.5">
+                {results.map(node => renderTreeNode(node, 0))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Drag handle */}
+        <div
+          onMouseDown={() => setIsDragging(true)}
+          className={`w-[5px] shrink-0 cursor-col-resize transition-colors ${isDragging ? 'bg-blue-400' : 'hover:bg-slate-200'} rounded`}
+        />
+
+        {/* Preview Panel */}
+        <div style={{ width: previewWidth }} className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden hidden md:flex">
+          {selectedResult ? (
+            <>
+              <div className="p-3 border-b border-slate-200 bg-slate-50">
+                <div className="flex items-center gap-2 mb-2">
+                  {React.createElement(LEVEL_CONFIG[selectedResult.type].icon, { size: 14, className: 'text-slate-600 shrink-0' })}
+                  <h3 className="text-xs font-semibold text-slate-800 truncate">{selectedResult.label}</h3>
+                </div>
+                <div className="flex gap-1">
+                  <button onClick={() => setPreviewTab('meta')} className={`px-2 py-1 text-[10px] rounded ${previewTab === 'meta' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-700'}`}>
+                    <Save size={11} className="inline mr-1" />元数据
+                  </button>
+                  {selectedResult.type === 'FILE' && (
+                    <button onClick={() => setPreviewTab('preview')} className={`px-2 py-1 text-[10px] rounded ${previewTab === 'preview' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-700'}`}>
+                      <Eye size={11} className="inline mr-1" />预览
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div className="flex-1 bg-white overflow-y-auto p-3">
+                {previewTab === 'meta' ? renderMetaPreview(selectedResult) : (
+                  <div className="border border-slate-200 rounded-lg overflow-hidden bg-white">
+                    {selectedResult.data.url ? (
+                      <embed src={selectedResult.data.url} type="application/pdf" className="w-full" style={{ height: '50vh' }} />
+                    ) : (
+                      <div className="text-center py-12 text-slate-400 text-xs">暂无文件预览</div>
+                    )}
+                  </div>
+                )}
+              </div>
+              <div className="p-2 bg-slate-50 border-t border-slate-200">
+                <button onClick={() => toggleBasket(selectedResult)} className={`w-full py-1.5 rounded text-[10px] font-medium transition-colors ${isInBasket(selectedResult.id, selectedResult.type) ? 'bg-blue-600 text-white' : 'text-slate-600 border border-slate-200 bg-white hover:bg-slate-50'}`}>
+                  {isInBasket(selectedResult.id, selectedResult.type) ? '✓ 已加入利用清单' : '+ 加入利用清单'}
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="flex-1 flex flex-col items-center justify-center text-slate-400">
+              <Eye size={36} className="mb-3 opacity-20" />
+              <p className="text-xs">选择检索结果查看详情</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Basket FAB */}
+      {basket.length > 0 && (
+        <div className="absolute bottom-4 right-4 bg-slate-800 text-white pr-2 rounded-full shadow-2xl flex items-center gap-3 z-30 border border-slate-700">
+          <div className="bg-blue-600 rounded-full w-9 h-9 flex items-center justify-center font-bold text-xs">{basket.length}</div>
+          <div className="text-[11px]">
+            <div className="font-bold">待利用清单</div>
+            <div className="text-[9px] text-slate-400">{basket.filter(i => i.type === 'FILE').length} 文件 · {basket.filter(i => i.type === 'VOLUME').length} 案卷</div>
+          </div>
+        </div>
+      )}
+
+      {/* Advanced Search */}
+      {isAdvancedOpen && (
+        <div className="absolute inset-0 z-40 overflow-hidden">
+          <div className="absolute inset-0 bg-slate-900/20 backdrop-blur-[1px]" onClick={() => setIsAdvancedOpen(false)} />
+          <div className="absolute inset-y-0 right-0 w-[520px] bg-white shadow-2xl border-l border-slate-200 flex flex-col">
+            <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <div className="flex items-center"><Filter className="text-blue-600 mr-2" size={18} /><h3 className="font-bold text-sm text-slate-800">高级筛选</h3></div>
+              <button onClick={() => setIsAdvancedOpen(false)}><X size={18} className="text-slate-400 hover:text-slate-600" /></button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-4">
+                <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3">添加条件</h4>
+                <div className="grid grid-cols-4 gap-2">
+                  <div>
+                    <label className="block text-[10px] font-medium text-slate-600 mb-1">层级</label>
+                    <select className="w-full p-2 border border-slate-300 rounded-lg text-xs" value={advLevel} onChange={e => { setAdvLevel(e.target.value); setAdvField('name'); }}>
+                      {Object.entries(LEVEL_CONFIG).map(([key, lc]) => <option key={key} value={key}>{lc.label}</option>)}
+                    </select>
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-[10px] font-medium text-slate-600 mb-1">字段</label>
+                    <select className="w-full p-2 border border-slate-300 rounded-lg text-xs" value={advField} onChange={e => setAdvField(e.target.value)}>
+                      {(fieldMap[advLevel] || []).map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-medium text-slate-600 mb-1">操作符</label>
+                    <select className="w-full p-2 border border-slate-300 rounded-lg text-xs" value={advOperator} onChange={e => setAdvOperator(e.target.value)}>
+                      {OPERATORS.map(op => <option key={op.value} value={op.value}>{op.label}</option>)}
+                    </select>
+                  </div>
+                  <div className="col-span-3">
+                    <label className="block text-[10px] font-medium text-slate-600 mb-1">值</label>
+                    <input type="text" className="w-full p-2 border border-slate-300 rounded-lg text-xs" placeholder="输入关键词..." value={advValue} onChange={e => setAdvValue(e.target.value)} />
+                  </div>
+                  <div className="flex items-end">
+                    <button onClick={addCondition} disabled={!advValue.trim()} className="w-full p-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white rounded-lg flex justify-center items-center"><Plus size={18} /></button>
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                {conditions.map(cond => (
+                  <div key={cond.id} className="bg-white p-2 rounded-lg border border-slate-200 flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-xs">
+                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${LEVEL_CONFIG[cond.level]?.color || ''}`}>{LEVEL_CONFIG[cond.level]?.label}</span>
+                      <span className="font-medium text-slate-700">{getFieldLabel(cond.level, cond.field)}</span>
+                      <span className="text-blue-600">{getOperatorLabel(cond.operator)}</span>
+                      <span className="text-slate-800">"{cond.value}"</span>
+                    </div>
+                    <button onClick={() => removeCondition(cond.id)} className="text-slate-300 hover:text-red-500"><X size={14} /></button>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="p-3 border-t border-slate-200 bg-slate-50">
+              <button onClick={() => setIsAdvancedOpen(false)} className="w-full py-2.5 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 shadow">应用筛选</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
